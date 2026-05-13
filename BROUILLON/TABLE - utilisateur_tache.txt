@@ -1,0 +1,25 @@
+UTILISATEUR_TACHE(
+  id_utilisateur,
+  id_tache,
+  date_attribution_tache,
+  date_echeance_tache
+)
+
+------------------------------------------------------------------------------
+
+create table utilisateur_tache (
+  id_utilisateur bigint not null,
+  id_tache bigint not null,
+  date_attribution_tache timestamp not null default now(),
+  date_echeance_tache timestamp,
+
+  primary key (id_utilisateur, id_tache),
+
+  constraint fk_utilisateur_tache_utilisateur
+    foreign key (id_utilisateur)
+    references utilisateur(id_utilisateur),
+
+  constraint fk_utilisateur_tache_tache
+    foreign key (id_tache)
+    references tache(id_tache)
+);

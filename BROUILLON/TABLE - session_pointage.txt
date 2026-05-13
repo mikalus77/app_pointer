@@ -1,0 +1,28 @@
+SESSION_POINTAGE(
+  id_session_pointage,
+  id_pointage,
+  debut_session_pointage,
+  fin_session_pointage,
+  commentaire_session_pointage
+)
+
+---------------------------------------------------------------------------
+
+create table session_pointage (
+  id_session_pointage bigint generated always as identity primary key,
+  id_pointage bigint not null,
+  debut_session_pointage timestamp not null default now(),
+  fin_session_pointage timestamp,
+  commentaire_session_pointage text,
+
+  constraint fk_session_pointage_pointage
+    foreign key (id_pointage)
+    references pointage(id_pointage),
+
+  constraint session_pointage_dates_check
+    check (
+      fin_session_pointage is null
+      or
+      debut_session_pointage < fin_session_pointage
+    )
+);

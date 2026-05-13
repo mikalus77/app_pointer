@@ -1,0 +1,41 @@
+POINTAGE(
+  id_pointage,
+  id_utilisateur_pointeur,
+  id_utilisateur_traitement,
+  id_tache,
+  id_statut_pointage,
+  date_pointage,
+  date_creation_pointage,
+  date_traitement_pointage,
+  remarque_admin_pointage
+)
+
+-------------------------------------------------------------------------------------------
+
+create table pointage (
+  id_pointage bigint generated always as identity primary key,
+  id_utilisateur_pointeur bigint not null,
+  id_utilisateur_traitement bigint,
+  id_tache bigint not null,
+  id_statut_pointage bigint not null,
+  date_pointage date not null,
+  date_creation_pointage timestamp not null default now(),
+  date_traitement_pointage timestamp,
+  remarque_admin_pointage text,
+
+  constraint fk_pointage_utilisateur_pointeur
+    foreign key (id_utilisateur_pointeur)
+    references utilisateur(id_utilisateur),
+
+  constraint fk_pointage_utilisateur_traitement
+    foreign key (id_utilisateur_traitement)
+    references utilisateur(id_utilisateur),
+
+  constraint fk_pointage_tache
+    foreign key (id_tache)
+    references tache(id_tache),
+
+  constraint fk_pointage_statut_pointage
+    foreign key (id_statut_pointage)
+    references statut_pointage(id_statut_pointage)
+);

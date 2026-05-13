@@ -1,0 +1,143 @@
+TYPE_DEMANDE(
+  id_type_demande,
+  code_type_demande,
+  libelle_type_demande,
+  actif
+)
+
+
+MOTIF_DEMANDE(
+  id_motif_demande,
+  code_motif_demande,
+  libelle_motif_demande,
+  justificatif_obligatoire,
+  actif
+)
+
+
+TYPE_MOTIF_DEMANDE(
+  id_type_demande,
+  id_motif_demande
+)
+
+
+STATUT_DEMANDE(
+  id_statut_demande,
+  code_statut_demande,
+  libelle_statut_demande
+)
+  
+
+DEMANDE(
+  id_demande,
+  id_utilisateur_demandeur,
+  id_utilisateur_traitement,
+  id_type_demande,
+  id_motif_demande,
+  id_statut_demande,
+  date_debut_demande,
+  date_fin_demande,
+  date_premier_envoi_demande,
+  date_dernier_envoi_demande,
+  date_traitement_demande,
+  commentaire_demande,
+  remarque_admin_demande  
+)
+
+
+JUSTIFICATIF_DEMANDE(
+  id_justificatif_demande,
+  id_demande,
+  nom_fichier_demande,
+  taille_fichier_demande,
+  type_fichier_demande,
+  cle_stockage_fichier_demande
+)
+
+
+FREQUENCE_NOTIF_CONTROLE_POINTAGE(
+  id_frequence_notif_controle_pointage,
+  code_frequence_notif_controle_pointage,   
+  libelle_frequence_notif_controle_pointage,  
+  nombre_minutes_frequence_notif_controle_pointage
+)
+
+
+CONTROLE_POINTAGE(
+  id_controle_pointage,
+  id_utilisateur_controle,
+  id_utilisateur_controleur,
+  id_frequence_notif_controle_pointage,
+  debut_controle_pointage,
+  fin_controle_pointage
+)
+
+
+NOTIF_CONTROLE_POINTAGE(
+  id_notif_controle_pointage,
+  id_controle_pointage,
+  id_pointage,
+  date_notif_controle_pointage,
+  reponse_notif_controle_pointage,
+  date_reponse_notif_controle_pointage,
+  rang_notif_controle_pointage
+)
+
+
+PLAGE_DOUTEUSE_POINTAGE(
+  id_plage_douteuse_pointage,
+  id_pointage,
+  id_notif_controle_pointage,
+  debut_plage_douteuse_pointage,
+  fin_plage_douteuse_pointage
+)
+  
+
+ROLE(
+  id_role,
+  code_role,
+  libelle_role,
+  actif
+)
+
+
+UTILISATEUR_ROLE(
+  id_utilisateur,
+  id_role
+)
+
+
+PERMISSION(
+  id_permission,
+  code_permission,
+  libelle_permission,
+  actif
+)
+
+
+ROLE_PERMISSION(
+  id_role,
+  id_permission
+)
+
+
+TYPE_ACTION(
+  id_type_action,
+  code_type_action,
+  libelle_type_action,
+  actif
+)
+
+
+HISTORIQUE_ACTION(
+  id_historique_action,
+  id_utilisateur_action,
+  id_type_action,
+  table_concernee,
+  id_ligne_concernee,
+  date_action,
+  anciennes_valeurs,
+  nouvelles_valeurs
+)
+
+

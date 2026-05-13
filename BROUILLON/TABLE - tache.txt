@@ -1,0 +1,25 @@
+TACHE(
+  id_tache,
+  id_utilisateur_createur,
+  titre_tache,
+  description_tache,
+  date_creation_tache,
+  actif
+)
+
+-------------------------------------------------------------------------------------------------
+
+create table tache (
+  id_tache bigint generated always as identity primary key,
+  id_utilisateur_createur bigint not null,
+  titre_tache varchar(90) not null,
+  description_tache text,
+  date_creation_tache timestamp not null default now(),
+  actif boolean not null default true,
+
+  constraint fk_tache_utilisateur_createur
+    foreign key (id_utilisateur_createur)
+    references utilisateur(id_utilisateur)
+);
+
+-------------------------------------------------------------------------------------------------

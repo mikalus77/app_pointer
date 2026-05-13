@@ -1,0 +1,23 @@
+STATUT_POINTAGE(
+  id_statut_pointage,
+  code_statut_pointage,
+  libelle_statut_pointage,
+  actif
+)
+
+---------------------------------------------------------------------------
+
+create table statut_pointage (
+  id_statut_pointage bigint generated always as identity primary key,
+  code_statut_pointage varchar(40) not null unique,
+  libelle_statut_pointage varchar(80) not null,
+  actif boolean not null default true
+);
+
+---------------------------------------------------------------------------
+
+insert into statut_pointage (code_statut_pointage, libelle_statut_pointage)
+values ('EN_COURS', 'en cours'),
+       ('TERMINE', 'terminé'),
+       ('DOUTEUX', 'douteux');
+

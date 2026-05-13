@@ -1,0 +1,28 @@
+PAUSE_POINTAGE(
+  id_pause_pointage,
+  id_session_pointage,
+  debut_pause_pointage,
+  fin_pause_pointage,
+  commentaire_pause_pointage
+)
+
+------------------------------------------------------------------
+
+create table pause_pointage (
+  id_pause_pointage bigint generated always as identity primary key,
+  id_session_pointage bigint not null,
+  debut_pause_pointage timestamp not null default now(),
+  fin_pause_pointage timestamp,
+  commentaire_pause_pointage text,
+
+  constraint fk_pause_pointage_session_pointage
+    foreign key (id_session_pointage)
+    references session_pointage(id_session_pointage),
+
+  constraint pause_pointage_dates_check
+    check (
+      fin_pause_pointage is null
+      or
+      debut_pause_pointage < fin_pause_pointage
+    )
+);

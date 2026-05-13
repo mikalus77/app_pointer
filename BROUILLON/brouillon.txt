@@ -1,0 +1,11 @@
+TYPES DEMANDE(MOTIFS)
+
+- ABSENCE (MALADIE, RDV MÉDICAL, TRANSPORT, FAMILIAL, AUTRE)
+- CONGÉ (CONGÉ PAYÉ, MALADIE, RDV MÉDICAL, FAMILIAL, PATERNITÉ/MATERNITÉ, AUTRE)
+- TÉLÉTRAVAIL (PLANIFIÉ, EXCEPTIONNEL, TRANSPORT, FAMILIAL, AUTRE)
+- MISSION (RDV PROFESSSIONNEL, MISSION EXTERNE, AUTRE)
+- RÉGULARISATION (RETARD, DÉPART ANTICIPÉ, ERREUR POINTAGE, OUBLI POINTAGE, AUTRE)*
+
+
+Lorsque "valider mon pointage" est cliqué, niveau affichage, réalise le même affichage que lorsqu'une cellule de l'onglet "mois" de la section "mon agenda" est cliqué, c'est-à-dire un 1er card avec écrit la date et un 2ème card beaucoup plus grand avec dans ce 2ème card le modèle de l'image ci-dessus (avec un bloc par tâche réalisée avec en haut à gauche le nom de la tâche et en bas à droite le nombre d'heures total cumulées à partir des durées de chaque session liée à cette tâche). Le bouton "X" est toujours là à la droite du 1er card. La nouveauté, ajoute un bouton "valider" en bas des deux cards. Comme avec l'onglet "mois" lorsqu'on a cet affichage tout le reste de l'écran est mis au second plan (flouté), et lorsqu'on clic sur le bouton "X" on revient à l'écran avant que "valider mon pointage" n'est été cliqué sans rien changer, et pour le moment rien ne se passe si on clic sur le bouton "valider". Et du coup annule les comportements actuels de "valider mon pointage" à savoir effacer l'affichage de MES TRAVAUX et MES PAUSES, ainsi que mettre TEMPS DE TRAVAIL et TEMPS DE PAUSE à 0.
+

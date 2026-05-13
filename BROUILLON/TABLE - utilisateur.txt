@@ -1,0 +1,39 @@
+UTILISATEUR(
+  id_utilisateur,
+  username_utilisateur,
+  password_utilisateur,
+  nom_utilisateur,
+  prenom_utilisateur,
+  email_utilisateur,
+  telephone_utilisateur,
+  adresse_utilisateur,
+  heure_min_pointage,
+  heure_max_pointage,
+  date_creation_utilisateur,
+  actif
+)
+
+---------------------------------------------------------------------------------------------------------------
+
+create table utilisateur (
+  id_utilisateur bigint generated always as identity primary key,
+  username_utilisateur varchar(40) not null unique,
+  password_utilisateur text not null,
+  nom_utilisateur varchar(90) not null,
+  prenom_utilisateur varchar(90) not null,
+  email_utilisateur varchar(140) not null unique,
+  telephone_utilisateur varchar(30),
+  adresse_utilisateur text,
+  heure_min_pointage time not null default '06:00:00',
+  heure_max_pointage time not null default '22:00:00',
+  date_creation_utilisateur timestamp not null default now(),
+  actif boolean not null default true
+);
+
+---------------------------------------------------------------------------------------------------------------
+
+alter table utilisateur
+add constraint heure_pointage_utilisateur_check
+check (heure_min_pointage < heure_max_pointage);
+
+---------------------------------------------------------------------------------------------------------------
