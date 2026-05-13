@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../lib/supabase";
 
@@ -13,7 +14,7 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [erreur, setErreur] = useState("");
 
-  const handleConnexion = async (e) => {
+  const handleConnexion = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErreur("");
 
