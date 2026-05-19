@@ -249,7 +249,7 @@
   align-items: center;
   gap: 9px;
   flex-wrap: nowrap;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 2px;
 }
@@ -334,58 +334,9 @@
   background-color: #eef4fb;
 }
 
-.expectedDurationBadge {
-  border: 0;
-  background: transparent;
-  border-radius: 0;
-  height: auto;
-  padding: 0;
-  margin-left: 27px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: "Poppins", sans-serif;
-  font-size: 15.4px;
-  font-weight: 600;
-  color: #2b4f7e;
-  white-space: nowrap;
-}
-
-.expectedDurationWorked {
-  display: inline-flex;
-  align-items: center;
-}
-
-.expectedDurationWorkedReached {
-  color: #1f7d4a;
-}
-
-.expectedDurationWorkedMissed {
-  color: #8f2d2d;
-}
-
-.expectedDurationUnit {
-  margin-left: 3px;
-  font-size: 0.62em;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  transform: translateY(-1px);
-}
-
-.expectedDurationSep {
-  margin: 0 9px;
-  opacity: 0.85;
-}
-
-.expectedDurationSlash {
-  margin: 0 10px;
-  opacity: 0.9;
-  font-weight: 700;
-}
-
 .weekGrid {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 5.2px;
   min-width: max-content;
   width: max-content;
@@ -405,7 +356,6 @@
   flex-direction: column;
   gap: 4px;
   flex: 0 0 auto;
-  align-self: stretch;
   min-width: 210px;
   width: max-content;
   max-width: 100%;
@@ -432,16 +382,8 @@
 }
 
 .dayCardEmpty {
-  flex: 1 1 auto;
+  overflow: hidden;
   min-height: 520px;
-}
-
-.dayCardStatusSuccess {
-  background-color: #f9fffc;
-}
-
-.dayCardStatusDanger {
-  background-color: #fffafa;
 }
 
 .daySummaryCard {
@@ -453,6 +395,7 @@
   gap: 0.75rem;
   padding: 0.15rem 0.1rem 0.05rem;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .daySummaryTotal {
@@ -467,26 +410,41 @@
   letter-spacing: 0.05em;
 }
 
-.daySummaryTotalReached {
-  border: 1px solid #36a168;
-  background: #eaf8f0;
-  color: #1f7d4a;
-}
-
-.daySummaryTotalMissed {
-  border: 1px solid #d89b9b;
-  background: #fff1f1;
-  color: #8f2d2d;
-}
-
 .daySummaryTasks {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   gap: 0.42rem;
   align-items: stretch;
-  width: max-content;
+  width: 100%;
   min-width: 100%;
   max-width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.daySummaryTasks::-webkit-scrollbar,
+.monthDetailEntries::-webkit-scrollbar {
+  width: 7px;
+}
+
+.daySummaryTasks::-webkit-scrollbar-track,
+.monthDetailEntries::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.daySummaryTasks::-webkit-scrollbar-thumb,
+.monthDetailEntries::-webkit-scrollbar-thumb {
+  background: #c4d6ea;
+  border-radius: 999px;
+  border: 1px solid #eef4fb;
+}
+
+.daySummaryTasks::-webkit-scrollbar-thumb:hover,
+.monthDetailEntries::-webkit-scrollbar-thumb:hover {
+  background: #9fb8d6;
 }
 
 .daySummaryTaskRow {
@@ -498,8 +456,7 @@
   border: 1px solid #d7e1ec;
   border-radius: 10px;
   background-color: #f8fbff;
-  width: auto;
-  min-width: 100%;
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -518,8 +475,8 @@
   min-width: 0;
   color: #3f5d7d;
   font-family: "Poppins", sans-serif;
-  font-size: 12.4px;
-  font-weight: 800;
+  font-size: 12.9px;
+  font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   text-align: left;
@@ -529,17 +486,17 @@
 
 .daySummaryTaskDuration {
   flex: 0 0 auto;
-  color: #5c88af;
+  color: #82b48a;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 13.8px;
-  font-weight: 750;
+  font-size: 13.5px;
+  font-weight: 600;
   letter-spacing: 0.04em;
 }
 
 .daySummaryTaskComment {
   color: #5f7690;
   font-family: var(--font-geist-sans), "Poppins", sans-serif;
-  font-size: 12.3px;
+  font-size: 12.2px;
   font-weight: 500;
   line-height: 1.45;
   text-align: left;
@@ -602,14 +559,6 @@
   cursor: pointer;
 }
 
-.monthCellStatusSuccess {
-  background-color: #f9fffc;
-}
-
-.monthCellStatusDanger {
-  background-color: #fffafa;
-}
-
 .monthCellEmpty {
   background-color: #f5f5f7;
 }
@@ -665,26 +614,10 @@
   max-width: calc(100% - 20px);
   color: #5c88af;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 13.8px;
+  font-size: 13.2px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-align: right;
-}
-
-.monthCellWorkTotalReached {
-  padding: 0.14rem 0.38rem;
-  border-radius: 8px;
-  border: 1px solid #36a168;
-  background: #eaf8f0;
-  color: #1f7d4a;
-}
-
-.monthCellWorkTotalMissed {
-  padding: 0.14rem 0.38rem;
-  border-radius: 8px;
-  border: 1px solid #d89b9b;
-  background: #fff1f1;
-  color: #8f2d2d;
 }
 
 .monthDetailOverlay {
@@ -702,7 +635,7 @@
 .monthDetailPanel {
   width: 360px;
   height: 699px;
-  --agenda-day-min-width: 352px;
+  --agenda-day-min-width: 342px;
   background-color: #f5f7fa;
   border: 1px solid #dce4ee;
   border-radius: 12px;
@@ -735,16 +668,18 @@
   background-color: transparent;
   border: 0;
   border-radius: 0;
-  min-height: 610px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding-right: 6px;
 }
 
 .monthDetailSummaryWrap {
   width: min(100%, var(--agenda-day-min-width));
-  height: auto;
-  min-height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.64rem;
@@ -758,11 +693,11 @@
   align-self: flex-end;
   padding: 0.18rem 0.42rem;
   border-radius: 9px;
-  border: 1px solid #a9bfd7;
+  border: 1px solid #a9bfd7   ;
   background: linear-gradient(180deg, #edf3fa 0%, #e3edf8 100%);
   color: #5c88af;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 14.4px;
+  font-size: 15px;
   font-weight: 500;
   letter-spacing: 0.05em;
 }
@@ -805,7 +740,7 @@
 }
 
 .pointageReviewPanel {
-  width: 480px;
+  min-width: 360px;
   height: 700px;
   --agenda-day-min-width: 320px;
   background-color: #f5f7fa;
@@ -818,24 +753,12 @@
   box-shadow: 0 14px 30px rgba(10, 25, 45, 0.22);
 }
 
-.pointageReviewMonthLikePanel {
-  width: 360px;
-  height: 699px;
-  --agenda-day-min-width: 352px;
-  border-radius: 12px;
-  gap: 0.45rem;
-}
-
 .pointageReviewHeaderRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.55rem;
   margin-bottom: 0.62rem;
-}
-
-.pointageReviewMonthLikeHeader {
-  margin-bottom: 0;
 }
 
 .pointageReviewDateLabel {
@@ -872,14 +795,6 @@
   align-self: flex-start;
 }
 
-.pointageReviewMonthLikeClose {
-  height: 34px;
-  font-size: 19px;
-  margin-top: 0;
-  margin-right: 0;
-  align-self: center;
-}
-
 .pointageReviewContentCard {
   flex: 1;
   background-color: transparent;
@@ -898,9 +813,8 @@
 }
 
 .pointageReviewMonthLikeScroll {
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 6px;
+  overflow: hidden;
+  padding-right: 0;
 }
 
 .pointageReviewContentCardSuccess {
@@ -947,6 +861,7 @@
   min-width: 0;
   padding: 0 0.1rem 0;
   box-sizing: border-box;
+  min-height: 0;
 }
 
 .monthDetailEntries {
@@ -955,7 +870,13 @@
   max-width: 100%;
   justify-items: stretch;
   align-self: center;
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #c4d6ea transparent;
 }
 
 .pointageReviewTaskCard {
@@ -1002,7 +923,7 @@
   font-family: var(--font-geist-sans), "Poppins", sans-serif;
   font-size: 12.3px;
   font-weight: 500;
-  line-height: 1.5;
+  line-height: 1.45;
   text-align: left;
   white-space: normal;
   width: 0;
@@ -1028,7 +949,7 @@
   grid-area: duration;
   color: #5c88af;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 14.1px;
+  font-size: 13.8px;
   font-weight: 750;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -1039,7 +960,8 @@
   align-self: center;
   width: 140px;
   height: 38px;
-  margin-top: 4px;
+  margin-top: 0;
+  flex-shrink: 0;
   border: 1px solid #3a6a9a;
   border-radius: 12px;
   background: linear-gradient(180deg, #3e6f9e 0%, #2f5c89 100%);
@@ -1113,7 +1035,7 @@
   color: #3f5d7d;
 }
 
-/* Scoped scrollbar style (accueil only) */
+/* Scoped scrollbar style (pointage only) */
 .page * {
   scrollbar-width: thin;
   scrollbar-color: #c4d6ea transparent;

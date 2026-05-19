@@ -1,0 +1,23 @@
+UTILISATEUR_ROLE(
+  id_utilisateur,
+  id_role
+)
+
+--------------------------------------------------------------------------------------------------------
+
+create table utilisateur_role (
+  id_utilisateur bigint not null,
+  id_role bigint not null,
+
+  primary key (id_utilisateur, id_role),
+
+  constraint fk_utilisateur_role_utilisateur
+    foreign key (id_utilisateur)
+    references utilisateur(id_utilisateur),
+
+  constraint fk_utilisateur_role_role
+    foreign key (id_role)
+    references role(id_role)
+);
+
+--------------------------------------------------------------------------------------------------------

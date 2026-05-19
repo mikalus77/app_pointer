@@ -1,0 +1,21 @@
+ROLE(
+  id_role,
+  code_role,
+  libelle_role,
+  actif
+)
+
+------------------------------------------------------------------------------------------------------
+
+create table role (
+  id_role bigint generated always as identity primary key,
+  code_role varchar(90) not null unique,
+  libelle_role varchar(140) not null,
+  actif boolean not null default true
+);
+
+------------------------------------------------------------------------------------------------------
+
+insert into role (code_role, libelle_role)
+values ('EMPLOYE', 'Employé - accès à son espace personnel'),
+       ('ADMIN', 'Administrateur - accès complet au logiciel');

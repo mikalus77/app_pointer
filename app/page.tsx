@@ -3,9 +3,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabase";
 
 const CONNECTED_USERNAME_STORAGE_KEY = "app_pointer_connected_username";
+const CONNECTED_USERNAME_CHANGED_EVENT = "app_pointer_connected_username_changed";
 
 export default function Home() {
   const router = useRouter();
@@ -18,23 +18,31 @@ export default function Home() {
     e.preventDefault();
     setErreur("");
 
-    const { data, error } = await supabase
-      .from("utilisateur")
-      .select("*")
-      .eq("username_utilisateur", username)
-      .eq("password_utilisateur", password)
-      .eq("actif", true)
-      .single();
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    });
 
-    if (error || !data) {
-      setErreur("Nom d'utilisateur ou mot de passe incorrect.");
+    const responseData = (await response.json().catch(() => null)) as
+      | { username?: string; error?: string }
+      | null;
+
+    if (!response.ok || !responseData?.username) {
+      setErreur(responseData?.error ?? "Nom d'utilisateur ou mot de passe incorrect.");
       return;
     }
 
     window.localStorage.setItem(
       CONNECTED_USERNAME_STORAGE_KEY,
-      data.username_utilisateur ?? username
+      responseData.username ?? username
     );
+    window.dispatchEvent(new Event(CONNECTED_USERNAME_CHANGED_EVENT));
     router.push("/accueil");
   };
 

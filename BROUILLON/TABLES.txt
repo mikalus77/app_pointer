@@ -93,34 +93,6 @@ PLAGE_DOUTEUSE_POINTAGE(
 )
   
 
-ROLE(
-  id_role,
-  code_role,
-  libelle_role,
-  actif
-)
-
-
-UTILISATEUR_ROLE(
-  id_utilisateur,
-  id_role
-)
-
-
-PERMISSION(
-  id_permission,
-  code_permission,
-  libelle_permission,
-  actif
-)
-
-
-ROLE_PERMISSION(
-  id_role,
-  id_permission
-)
-
-
 TYPE_ACTION(
   id_type_action,
   code_type_action,

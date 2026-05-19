@@ -1,0 +1,32 @@
+ROLE_PERMISSION(
+  id_role,
+  id_permission
+)
+
+-------------------------------------------------------------------------------------------------------
+
+create table role_permission (
+  id_role bigint not null,
+  id_permission bigint not null,
+
+  primary key (id_role, id_permission),
+
+  constraint fk_role_permission_role
+    foreign key (id_role)
+    references role(id_role),
+
+  constraint fk_role_permission_permission
+    foreign key (id_permission)
+    references permission(id_permission)
+);
+
+-------------------------------------------------------------------------------------------------------
+
+insert into role_permission (id_role, id_permission)
+values (1, 1), -> EMPLOYE → ACCES_ESPACE_PERSONNEL
+       (2, 1), -> ADMIN → ACCES_ESPACE_PERSONNEL
+       (2, 2), -> ADMIN → GERER_TACHES
+       (2, 3), -> ADMIN → GERER_DEMANDES
+       (2, 4), -> ADMIN → GERER_POINTAGES
+       (2, 5), -> ADMIN → GERER_UTILISATEURS
+       (2, 6); -> ADMIN → GERER_DONNEES

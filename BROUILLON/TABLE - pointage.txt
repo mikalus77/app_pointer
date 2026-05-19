@@ -7,7 +7,8 @@ POINTAGE(
   date_pointage,
   date_creation_pointage,
   date_traitement_pointage,
-  remarque_admin_pointage
+  remarque_admin_pointage,
+  libelle_tache_libre_pointage 
 )
 
 -------------------------------------------------------------------------------------------
@@ -22,6 +23,7 @@ create table pointage (
   date_creation_pointage timestamp not null default now(),
   date_traitement_pointage timestamp,
   remarque_admin_pointage text,
+  libelle_tache_libre_pointage varchar(140) null,
 
   constraint fk_pointage_utilisateur_pointeur
     foreign key (id_utilisateur_pointeur)

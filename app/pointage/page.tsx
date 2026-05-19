@@ -434,7 +434,7 @@ export default function AccueilPage() {
   const [yesterdayPointageSnapshot, setYesterdayPointageSnapshot] =
     useState<PointageDaySnapshot | null>(null)
   const [connectedUserId, setConnectedUserId] = useState<number | null>(null)
-  const [expectedWeeklyDurationMs, setExpectedWeeklyDurationMs] = useState<number | null>(null)
+  const [expectedDailyDurationMs, setExpectedDailyDurationMs] = useState<number | null>(null)
   const [currentPointageId, setCurrentPointageId] = useState<number | null>(null)
   const [currentSessionPointageId, setCurrentSessionPointageId] = useState<number | null>(null)
   const [currentPausePointageId, setCurrentPausePointageId] = useState<number | null>(null)
@@ -516,7 +516,7 @@ export default function AccueilPage() {
 
   useEffect(() => {
     if (connectedUserId === null) {
-      setExpectedWeeklyDurationMs(null)
+      setExpectedDailyDurationMs(null)
       return
     }
 
@@ -534,17 +534,17 @@ export default function AccueilPage() {
       }
 
       if (error || !data) {
-        setExpectedWeeklyDurationMs(null)
+        setExpectedDailyDurationMs(null)
         return
       }
 
       const expectedDailyMinutes = Number(data.duree_journaliere_attendue_utilisateur)
       if (!Number.isFinite(expectedDailyMinutes) || expectedDailyMinutes < 0) {
-        setExpectedWeeklyDurationMs(null)
+        setExpectedDailyDurationMs(null)
         return
       }
 
-      setExpectedWeeklyDurationMs(expectedDailyMinutes * 5 * 60 * 1000)
+      setExpectedDailyDurationMs(expectedDailyMinutes * 60 * 1000)
     }
 
     void loadExpectedDuration()
@@ -929,7 +929,8 @@ export default function AccueilPage() {
 
   useEffect(() => {
     setActiveTab('tab1')
-    setActiveMenu('accueil')
+    setActiveMenu('pointer')
+    setActivePointagesSubMenu('nouveau')
   }, [])
 
   const todayAtLoad = useMemo(() => new Date(), [])
@@ -1968,54 +1969,6 @@ export default function AccueilPage() {
     const seconds = String(totalSeconds % 60).padStart(2, '0')
     return { hours, minutes, seconds }
   }
-  const expectedWeeklyDurationParts =
-    expectedWeeklyDurationMs === null ? null : formatDurationParts(expectedWeeklyDurationMs)
-  const expectedDailyDurationMs =
-    expectedWeeklyDurationMs === null ? null : Math.round(expectedWeeklyDurationMs / 5)
-  const monthWorkingDaysCount = useMemo(() => {
-    let count = 0
-    const cursor = new Date(monthStart)
-    while (cursor <= monthEnd) {
-      const weekday = cursor.getDay()
-      if (weekday >= 1 && weekday <= 5) {
-        count += 1
-      }
-      cursor.setDate(cursor.getDate() + 1)
-    }
-    return count
-  }, [monthEnd, monthStart])
-  const expectedMonthDurationMs =
-    expectedDailyDurationMs === null ? null : expectedDailyDurationMs * monthWorkingDaysCount
-  const weekWorkedDurationMs = useMemo(
-    () =>
-      weekDays.reduce((sum, day) => {
-        const daySummary = agendaDaySummaries[getLocalDateStamp(day)]
-        return sum + (daySummary?.totalWorkMs ?? 0)
-      }, 0),
-    [agendaDaySummaries, weekDays]
-  )
-  const monthWorkedDurationMs = useMemo(() => {
-    let total = 0
-    const cursor = new Date(monthStart)
-    while (cursor <= monthEnd) {
-      const daySummary = agendaDaySummaries[getLocalDateStamp(cursor)]
-      total += daySummary?.totalWorkMs ?? 0
-      cursor.setDate(cursor.getDate() + 1)
-    }
-    return total
-  }, [agendaDaySummaries, monthEnd, monthStart])
-  const periodWorkedDurationMs = activeAgendaTab === 'semaine' ? weekWorkedDurationMs : monthWorkedDurationMs
-  const periodWorkedDurationParts = formatDurationParts(periodWorkedDurationMs)
-  const expectedPeriodDurationMs =
-    activeAgendaTab === 'semaine' ? expectedWeeklyDurationMs : expectedMonthDurationMs
-  const expectedPeriodDurationParts =
-    activeAgendaTab === 'semaine'
-      ? expectedWeeklyDurationParts
-      : expectedMonthDurationMs === null
-        ? null
-        : formatDurationParts(expectedMonthDurationMs)
-  const isPeriodTargetReached =
-    expectedPeriodDurationMs !== null && periodWorkedDurationMs >= expectedPeriodDurationMs
 
   const formatTimeLabel = (isoString: string) =>
     parseStoredTimestamp(isoString).toLocaleTimeString('fr-FR', {
@@ -2074,17 +2027,9 @@ export default function AccueilPage() {
   const monthDetailSummary = monthDetailDate
     ? agendaDaySummaries[getLocalDateStamp(monthDetailDate)] ?? null
     : null
-  const monthDetailHasDailyTargetStatus = useMemo(() => {
-    if (!monthDetailDate || !monthDetailSummary || expectedDailyDurationMs === null) {
-      return false
-    }
-    return getLocalDateStamp(monthDetailDate) < getLocalDateStamp(todayAtLoad)
-  }, [expectedDailyDurationMs, monthDetailDate, monthDetailSummary, todayAtLoad])
-  const monthDetailDailyTargetReached =
-    monthDetailHasDailyTargetStatus &&
-    monthDetailSummary !== null &&
+  const isValidationDailyTargetReached =
     expectedDailyDurationMs !== null &&
-    monthDetailSummary.totalWorkMs >= expectedDailyDurationMs
+    (isYesterdayView ? viewedWorkTotalMs : displayedTotalWorkMs) >= expectedDailyDurationMs
   const pointageReviewSourceSummary = useMemo(() => {
     const summary = summarizeWorkEntries(viewedWorkEntries)
     return {
@@ -3262,29 +3207,18 @@ export default function AccueilPage() {
         onConfigurationTabChange={setActiveConfigurationTab}
         onLogout={handleLogout}
         middleContent={
-          activeTab === 'tab1' && activeMenu === 'accueil' ? (
-            <div className={styles.agendaTabStrip} role="tablist" aria-label="Vue agenda">
+          activeTab === 'tab1' && activeMenu === 'pointer' ? (
+            <div className={styles.agendaTabStrip} role="tablist" aria-label="Vue pointage">
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeAgendaTab === 'semaine'}
+                aria-selected={activePointagesSubMenu === 'nouveau'}
                 className={`${styles.tabButton} ${
-                  activeAgendaTab === 'semaine' ? styles.tabButtonActive : ''
+                  activePointagesSubMenu === 'nouveau' ? styles.tabButtonActive : ''
                 }`}
-                onClick={() => setActiveAgendaTab('semaine')}
+                onClick={() => setActivePointagesSubMenu('nouveau')}
               >
-                Semaine
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeAgendaTab === 'mois'}
-                className={`${styles.tabButton} ${
-                  activeAgendaTab === 'mois' ? styles.tabButtonActive : ''
-                }`}
-                onClick={() => setActiveAgendaTab('mois')}
-              >
-                Mois
+                Nouveau pointage
               </button>
             </div>
           ) : activeTab === 'tab1' &&
@@ -3317,257 +3251,337 @@ export default function AccueilPage() {
           ) : null
         }
       >
-        {activeTab === 'tab1' && activeMenu === 'accueil' ? (
-            <div className={styles.agendaWrap}>
-              <div className={styles.agendaHeader}>
-                <button
-                  type="button"
-                  className={styles.weekNavButton}
-                  aria-label={activeAgendaTab === 'semaine' ? 'Semaine pr\u00e9c\u00e9dente' : 'Mois pr\u00e9c\u00e9dent'}
-                  onClick={activeAgendaTab === 'semaine' ? goToPreviousWeek : goToPreviousMonth}
-                >
-                  {'\u2039'}
-                </button>
-                <p className={styles.agendaRange}>
-                  {activeAgendaTab === 'semaine' ? weekRangeLabel : monthRangeLabel}
-                </p>
-                <button
-                  type="button"
-                  className={styles.weekNavButton}
-                  aria-label={activeAgendaTab === 'semaine' ? 'Semaine suivante' : 'Mois suivant'}
-                  onClick={activeAgendaTab === 'semaine' ? goToNextWeek : goToNextMonth}
-                >
-                  {'\u203a'}
-                </button>
-                <div className={styles.dateControls}>
-                  <div className={styles.datePickers}>
-                    <select
-                      className={styles.dateSelect}
-                      aria-label="Jour"
-                      value={selectedDay}
-                      onChange={(event) => handleSelectedDayChange(Number(event.target.value))}
-                    >
-                      {Array.from({ length: daysInSelectedMonth }, (_, index) => index + 1).map(
-                        (day) => (
-                          <option key={`day-${day}`} value={day}>
-                            {String(day).padStart(2, '0')}
-                          </option>
-                        )
-                      )}
-                    </select>
-                    <select
-                      className={styles.dateSelect}
-                      aria-label="Mois"
-                      value={selectedMonth}
-                      onChange={(event) => handleSelectedMonthChange(Number(event.target.value))}
-                    >
-                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
-                        <option key={`month-${month}`} value={month}>
-                          {String(month).padStart(2, '0')}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className={styles.dateSelect}
-                      aria-label={'Ann\u00e9e'}
-                      value={selectedYear}
-                      onChange={(event) => handleSelectedYearChange(Number(event.target.value))}
-                    >
-                      {yearOptions.map((year) => (
-                        <option key={`year-${year}`} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
+        {activeTab === 'tab1' &&
+        activeMenu === 'pointer' &&
+        activePointagesSubMenu === 'nouveau' ? (
+            <div className={styles.pointageLayout}>
+              {yesterdayPointageSnapshot ? (
+                <div className={styles.pointageDaySwitch} role="tablist" aria-label="Jour de pointage">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={pointageDayView === 'yesterday'}
+                    className={`${styles.tabButton} ${
+                      pointageDayView === 'yesterday' ? styles.tabButtonActive : ''
+                    }`}
+                    onClick={() => setPointageDayView('yesterday')}
+                  >
+                    {`Hier - ${yesterdayLabel}`}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={pointageDayView === 'today'}
+                    className={`${styles.tabButton} ${
+                      pointageDayView === 'today' ? styles.tabButtonActive : ''
+                    }`}
+                    onClick={() => setPointageDayView('today')}
+                  >
+                    {`Aujourd'hui - ${todayLabel}`}
+                  </button>
+                </div>
+              ) : null}
+              <div className={styles.pointageTopPane}>
+                <div className={`${styles.statsCard} ${styles.statsCardWork}`}>
+                  <div className={styles.statsCardTitle}>TEMPS DE TRAVAIL</div>
+                  <div className={styles.statsCardValue}>
+                    <span>{formatDurationParts(isYesterdayView ? viewedWorkTotalMs : displayedTotalWorkMs).hours}</span>
+                    <span className={styles.statsUnit}>H</span>
+                    <span className={styles.statsSep}> - </span>
+                    <span>{formatDurationParts(isYesterdayView ? viewedWorkTotalMs : displayedTotalWorkMs).minutes}</span>
+                    <span className={styles.statsUnit}>MIN</span>
+                    <span className={styles.statsSep}> - </span>
+                    <span>{formatDurationParts(isYesterdayView ? viewedWorkTotalMs : displayedTotalWorkMs).seconds}</span>
+                    <span className={styles.statsUnit}>SEC</span>
                   </div>
-                  {!isCurrentPeriod ? (
-                    <button
-                      type="button"
-                      className={styles.todayButton}
-                      aria-label={"Revenir \u00e0 aujourd'hui"}
-                      onClick={resetToToday}
+                </div>
+                <div className={`${styles.statsCard} ${styles.statsCardPause}`}>
+                  <div className={styles.statsCardTitle}>TEMPS DE PAUSE</div>
+                  <div className={styles.statsCardValue}>
+                    <span>{formatDurationParts(isYesterdayView ? viewedPauseTotalMs : displayedTotalPauseMs).hours}</span>
+                    <span className={styles.statsUnit}>H</span>
+                    <span className={styles.statsSep}> - </span>
+                    <span>{formatDurationParts(isYesterdayView ? viewedPauseTotalMs : displayedTotalPauseMs).minutes}</span>
+                    <span className={styles.statsUnit}>MIN</span>
+                    <span className={styles.statsSep}> - </span>
+                    <span>{formatDurationParts(isYesterdayView ? viewedPauseTotalMs : displayedTotalPauseMs).seconds}</span>
+                    <span className={styles.statsUnit}>SEC</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={styles.pointageValidateBtn}
+                  disabled={!canValidatePointage}
+                  onClick={validatePointage}
+                >
+                  Valider le pointage
+                </button>
+              </div>
+              <div
+                className={`${styles.pointageBottomPane} ${
+                  isYesterdayView ? styles.pointageBottomPaneYesterday : ''
+                }`}
+              >
+                <div className={styles.pointageBottomScroll}>
+                  {!isYesterdayView ? (
+                    <div
+                      className={`${styles.pointageWrap} ${
+                        pointageMode === 'idle' ? styles.pointageWrapIdle : styles.pointageWrapActive
+                      }`}
                     >
-                      &#8635; Aujourd&apos;hui
-                    </button>
-                  ) : null}
-                  {expectedPeriodDurationParts ? (
-                    <div className={styles.expectedDurationBadge} aria-label="DurÃ©e attendue hebdomadaire">
-                      <span
-                        className={`${styles.expectedDurationWorked} ${
-                          isPeriodTargetReached
-                            ? styles.expectedDurationWorkedReached
-                            : styles.expectedDurationWorkedMissed
+                    <div className={styles.pointageRowShell}>
+                      <div
+                        className={`${styles.pointageRow} ${
+                          pointageMode === 'idle'
+                            ? styles.pointageRowIdle
+                            : styles.pointageRowActive
                         }`}
                       >
-                        <span>{periodWorkedDurationParts.hours}</span>
-                        <span className={styles.expectedDurationUnit}>H</span>
-                        <span className={styles.expectedDurationSep}> - </span>
-                        <span>{periodWorkedDurationParts.minutes}</span>
-                        <span className={styles.expectedDurationUnit}>MIN</span>
-                        <span className={styles.expectedDurationSep}> - </span>
-                        <span>{periodWorkedDurationParts.seconds}</span>
-                        <span className={styles.expectedDurationUnit}>SEC</span>
-                      </span>
-                      <span className={styles.expectedDurationSlash}> / </span>
-                      <span>{expectedPeriodDurationParts.hours}</span>
-                      <span className={styles.expectedDurationUnit}>H</span>
-                      <span className={styles.expectedDurationSep}> - </span>
-                      <span>{expectedPeriodDurationParts.minutes}</span>
-                      <span className={styles.expectedDurationUnit}>MIN</span>
-                      <span className={styles.expectedDurationSep}> - </span>
-                      <span>{expectedPeriodDurationParts.seconds}</span>
-                      <span className={styles.expectedDurationUnit}>SEC</span>
+                        {pointageMode === 'idle' ? (
+                          <>
+                            <select
+                              className={styles.pointageSelect}
+                              aria-label={'Type de t\u00e2che'}
+                              value={taskChoice}
+                              onChange={(event) => setTaskChoice(event.target.value)}
+                              disabled={taskLoading || taskOptions.length === 0}
+                            >
+                              {taskChoice ? null : (
+                                <option value="" disabled>
+                                  {taskLoading
+                                    ? 'Chargement des t\u00e2ches...'
+                                    : taskLoadError || 'Aucune t\u00e2che attribu\u00e9e.'}
+                                </option>
+                              )}
+                            {taskOptions.map((task) => (
+                                <option key={task.id} value={task.id}>
+                                  {task.title}
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        ) : (
+                          <div className={styles.pointageTextZone}>{taskLabel}</div>
+                        )}
+                        <div className={styles.pointageTimer}>{formatDuration(workElapsedMs)}</div>
+                        {pointageMode === 'idle' ? (
+                          <button
+                            type="button"
+                            className={`${styles.pointageActionBtn} ${styles.pointageStartBtn}`}
+                            onClick={startPointage}
+                            disabled={!taskChoice || taskLoading}
+                          >
+                            {'D\u00c9MARRER'}
+                          </button>
+                        ) : pointageMode === 'running' ? (
+                          <>
+                            <button
+                              type="button"
+                              className={`${styles.pointageActionBtn} ${styles.pointagePauseResumeBtn}`}
+                              onClick={pausePointage}
+                              disabled={pointageMutationPending}
+                            >
+                              Pause
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.pointageStopBtn}
+                              onClick={stopPointage}
+                              disabled={pointageMutationPending}
+                            >
+                              {'Arr\u00eater'}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className={`${styles.pointageActionBtn} ${styles.pointagePauseResumeBtn}`}
+                              onClick={resumePointage}
+                              disabled={pointageMutationPending}
+                            >
+                              Reprendre
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.pointageStopBtn}
+                              onClick={stopPointage}
+                              disabled={pointageMutationPending}
+                            >
+                              {'Arr\u00eater'}
+                            </button>
+                          </>
+                        )}
+
+                        {pointageMode === 'idle' && isOtherTaskSelected ? (
+                          <input
+                            type="text"
+                            className={styles.pointageCustomTaskField}
+                            aria-label={'Libell\u00e9 de la t\u00e2che libre'}
+                            placeholder={'ajouter votre t\u00e2che'}
+                            value={otherTaskLabel}
+                            onChange={(event) => setOtherTaskLabel(event.target.value)}
+                            disabled={taskLoading || pointageMutationPending}
+                          />
+                        ) : null}
+
+                        {pointageMode !== 'idle' ? (
+                          <textarea
+                            className={styles.pointageCommentField}
+                            aria-label="Commentaire du pointage"
+                            placeholder="ajouter commentaire"
+                            value={pointageComment}
+                            onChange={(event) => setPointageComment(event.target.value)}
+                            rows={3}
+                          />
+                        ) : null}
+                        {pointageStopError ? (
+                          <p className={styles.pointageInlineError}>{pointageStopError}</p>
+                        ) : null}
+                      </div>
+                      {pointageMode !== 'idle' ? (
+                        <span
+                          className={`${styles.pointageRowIndicator} ${styles.pointageRowIndicatorWork}`}
+                          aria-hidden="true"
+                        >
+                          TRAVAIL
+                        </span>
+                      ) : null}
+                    </div>
+
+                    {pointageMode === 'paused' ? (
+                      <div className={`${styles.pointageRowShell} ${styles.pointageRowPauseShell}`}>
+                        <div className={`${styles.pointageRow} ${styles.pointageRowPause}`}>
+                          <textarea
+                            className={styles.pointagePauseCommentField}
+                            aria-label="Commentaire de pause"
+                            placeholder="ajouter commentaire"
+                            value={pauseComment}
+                            onChange={(event) => setPauseComment(event.target.value)}
+                            rows={2}
+                          />
+                          <div className={styles.pointageTimer}>{formatDuration(pauseElapsedMs)}</div>
+                        </div>
+                        <span
+                          className={`${styles.pointageRowIndicator} ${styles.pointageRowIndicatorPause}`}
+                          aria-hidden="true"
+                        >
+                          PAUSE
+                        </span>
+                      </div>
+                    ) : null}
+                    </div>
+                  ) : null}
+                  {viewedWorkEntries.length > 0 ? (
+                    <div className={styles.workHistoryOuter}>
+                      <section className={styles.workHistoryBlock} aria-label="Mes travaux">
+                        <div className={styles.workHistoryHeader}>
+                          <h2 className={styles.workHistoryTitle}>MES TRAVAUX</h2>
+                          <div className={styles.workHistoryTotal}>
+                            {formatDuration(isYesterdayView ? viewedWorkTotalMs : displayedTotalWorkMs)}
+                          </div>
+                        </div>
+                        <div className={styles.workHistoryBody}>
+                          {viewedWorkEntries.map((entry) => {
+                            const latestComment = getLatestWorkComment(entry)
+                            const isEntryLocked =
+                              currentWorkEntryId === entry.pointageId
+
+                            return (
+                              <div
+                                key={entry.pointageId}
+                                className={`${styles.workHistoryRow} ${
+                                  isEntryLocked ? styles.workHistoryRowMuted : ''
+                                }`}
+                              >
+                                <div className={styles.workHistoryTask}>{entry.taskTitle}</div>
+                                <div className={styles.workHistoryTimes}>
+                                  {entry.sessions.map((session) => (
+                                    <div
+                                      key={session.sessionId}
+                                      className={styles.workHistoryTimeRange}
+                                    >
+                                      {formatTimeLabel(session.startIso)} -{' '}
+                                      {formatTimeLabel(session.endIso)}
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className={styles.workHistoryDuration}>
+                                  {formatDuration(entry.totalDurationMs)}
+                                </div>
+                                <div className={styles.workHistoryComment}>
+                                  {latestComment || '-'}
+                                </div>
+                                <div className={styles.workHistoryActions}>
+                                  <button
+                                    type="button"
+                                    className={styles.workHistoryIconBtn}
+                                    aria-label={`Relancer ${entry.taskTitle}`}
+                                    title={'Relancer cette t\u00e2che'}
+                                    onClick={() => prepareWorkResume(entry)}
+                                    disabled={
+                                      isYesterdayView ||
+                                      isEntryLocked ||
+                                      pointageMode !== 'idle' ||
+                                      pointageMutationPending
+                                    }
+                                  >
+                                    {'\u25b6'}
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    </div>
+                  ) : null}
+                  {viewedPauseEntries.length > 0 ? (
+                    <div className={styles.pauseHistoryOuter}>
+                      <section className={styles.pauseHistoryBlock} aria-label="Mes pauses">
+                        <div className={styles.pauseHistoryHeader}>
+                          <h2 className={styles.pauseHistoryTitle}>MES PAUSES</h2>
+                          <div className={styles.pauseHistoryTotal}>
+                            {formatDuration(isYesterdayView ? viewedPauseTotalMs : displayedTotalPauseMs)}
+                          </div>
+                        </div>
+                        <div className={styles.pauseHistoryBody}>
+                          {viewedPauseEntries.map((entry) => {
+                            const isPauseEntryLocked =
+                              pointageMode === 'paused' &&
+                              currentPausePointageId !== null &&
+                              entry.taskId === (currentWorkEntry?.taskId ?? taskChoice)
+
+                            return (
+                              <div
+                                key={entry.taskId}
+                                className={`${styles.pauseHistoryRow} ${
+                                  isPauseEntryLocked ? styles.pauseHistoryRowMuted : ''
+                                }`}
+                              >
+                                <div className={styles.pauseHistoryTask}>
+                                  {`Pause \u2022 ${entry.taskTitle}`}
+                                </div>
+                                <div className={styles.pauseHistoryTimes}>
+                                  {entry.pauses.map((pause) => (
+                                    <div key={pause.pauseId} className={styles.pauseHistoryTimeRange}>
+                                      {formatTimeLabel(pause.startIso)} - {formatTimeLabel(pause.endIso)}
+                                      {pause.comment ? ` (${pause.comment})` : ''}
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className={styles.pauseHistoryDuration}>
+                                  {formatDuration(entry.totalDurationMs)}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
                     </div>
                   ) : null}
                 </div>
               </div>
-              {activeAgendaTab === 'semaine' ? (
-                <div className={styles.cardsScrollArea}>
-                  <div className={styles.weekGrid}>
-                    {weekDays.map((day, index) => {
-                      const dayStamp = getLocalDateStamp(day)
-                      const todayStamp = getLocalDateStamp(todayAtLoad)
-                      const isToday = isSameCalendarDay(day, todayAtLoad)
-                      const daySummary = agendaDaySummaries[dayStamp] ?? null
-                      const canColorizeCompletedDay = dayStamp < todayStamp
-                      const hasDailyTargetStatus =
-                        expectedDailyDurationMs !== null && daySummary && canColorizeCompletedDay
-                      const isDailyTargetReached =
-                        hasDailyTargetStatus && daySummary.totalWorkMs >= expectedDailyDurationMs
-                      return (
-                        <div key={day.toISOString()} className={styles.dayColumn}>
-                          <article
-                            className={`${styles.dayCard} ${styles.dayCardHeader} ${
-                              isToday ? styles.dayCardToday : ''
-                            } ${
-                              hasDailyTargetStatus
-                                ? isDailyTargetReached
-                                  ? styles.dayCardStatusSuccess
-                                  : styles.dayCardStatusDanger
-                                : ''
-                            }`}
-                          >
-                            <p className={styles.dayName}>
-                              {WEEKDAY_NAMES[index]} -{' '}
-                              {day.toLocaleDateString('fr-FR', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: '2-digit',
-                              })}
-                            </p>
-                          </article>
-                          <article
-                            className={`${styles.dayCard} ${styles.dayCardEmpty} ${
-                              hasDailyTargetStatus
-                                ? isDailyTargetReached
-                                  ? styles.dayCardStatusSuccess
-                                  : styles.dayCardStatusDanger
-                                : ''
-                            }`}
-                          >
-                            {daySummary ? (
-                              <div className={styles.daySummaryCard}>
-                                <div
-                                  className={`${styles.daySummaryTotal} ${
-                                    hasDailyTargetStatus
-                                      ? isDailyTargetReached
-                                        ? styles.daySummaryTotalReached
-                                        : styles.daySummaryTotalMissed
-                                      : ''
-                                  }`}
-                                >
-                                  {formatDuration(daySummary.totalWorkMs)}
-                                </div>
-                                <div className={styles.daySummaryTasks}>
-                                  {daySummary.tasks.map((task) => (
-                                    <div key={task.taskKey} className={styles.daySummaryTaskRow}>
-                                      <div className={styles.daySummaryTaskMain}>
-                                        <span className={styles.daySummaryTaskTitle}>{task.taskTitle}</span>
-                                        <span className={styles.daySummaryTaskDuration}>
-                                          {formatDuration(task.totalDurationMs)}
-                                        </span>
-                                      </div>
-                                      {task.comment !== '-' ? (
-                                        <div className={styles.daySummaryTaskComment}>
-                                          {splitCommentLines(task.comment).map((line, index) => (
-                                            <div key={`${task.taskKey}-comment-${index}`} className={styles.commentLine}>
-                                              <span className={styles.commentMarker}>â–¸</span> {line}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
-                          </article>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.cardsScrollArea}>
-                  <div className={styles.monthCalendar}>
-                    {WEEKDAY_NAMES.map((dayName) => (
-                      <div key={`month-head-${dayName}`} className={styles.monthHeadCell}>
-                        {dayName}
-                      </div>
-                    ))}
-                    {monthCalendarCells.map((day, index) => {
-                      if (!day) {
-                        return <div key={`empty-${index}`} className={styles.monthCellEmpty} />
-                      }
-                      const dayStamp = getLocalDateStamp(day)
-                      const todayStamp = getLocalDateStamp(todayAtLoad)
-                      const isToday = isSameCalendarDay(day, todayAtLoad)
-                      const daySummary = agendaDaySummaries[dayStamp] ?? null
-                      const canColorizeCompletedDay = dayStamp < todayStamp
-                      const hasDailyTargetStatus =
-                        expectedDailyDurationMs !== null && daySummary && canColorizeCompletedDay
-                      const isDailyTargetReached =
-                        hasDailyTargetStatus && daySummary.totalWorkMs >= expectedDailyDurationMs
-                      return (
-                        <div
-                          key={day.toISOString()}
-                          className={`${styles.monthCell} ${isToday ? styles.monthCellToday : ''} ${
-                            hasDailyTargetStatus
-                              ? isDailyTargetReached
-                                ? styles.monthCellStatusSuccess
-                                : styles.monthCellStatusDanger
-                              : ''
-                          }`}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setMonthDetailDate(day)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              event.preventDefault()
-                              setMonthDetailDate(day)
-                            }
-                          }}
-                        >
-                          <span className={styles.monthCellDayNumber}>{day.getDate()}</span>
-                          {daySummary ? (
-                            <span
-                              className={`${styles.monthCellWorkTotal} ${
-                                hasDailyTargetStatus
-                                  ? isDailyTargetReached
-                                    ? styles.monthCellWorkTotalReached
-                                    : styles.monthCellWorkTotalMissed
-                                  : ''
-                              }`}
-                            >
-                              {formatDuration(daySummary.totalWorkMs)}
-                            </span>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <div className={styles.zoneLabel}>
@@ -3590,9 +3604,9 @@ export default function AccueilPage() {
             <div className={styles.monthDetailHeaderRow}>
               <article className={styles.monthDetailMainCard}>
                 <p className={styles.dayName}>
-                  {capitalizeFirstLetter(monthDetailDate.toLocaleDateString('fr-FR', {
+                  {monthDetailDate.toLocaleDateString('fr-FR', {
                     weekday: 'long',
-                  }))}{' '}
+                  })}{' '}
                   -{' '}
                   {monthDetailDate.toLocaleDateString('fr-FR', {
                     day: '2-digit',
@@ -3613,22 +3627,14 @@ export default function AccueilPage() {
             <article className={styles.monthDetailEmptyCard}>
               {monthDetailSummary ? (
                 <div className={styles.monthDetailSummaryWrap}>
-                  <div
-                    className={`${styles.monthDetailSummaryTotal} ${
-                      monthDetailHasDailyTargetStatus
-                        ? monthDetailDailyTargetReached
-                          ? styles.monthDetailSummaryTotalReached
-                          : styles.monthDetailSummaryTotalMissed
-                        : ''
-                    }`}
-                  >
+                  <div className={styles.monthDetailSummaryTotal}>
                     {formatDuration(monthDetailSummary.totalWorkMs)}
                   </div>
-                  <div className={`${styles.pointageReviewEntries} ${styles.monthDetailEntries}`}>
+                  <div className={styles.pointageReviewEntries}>
                     {monthDetailSummary.tasks.map((task) => (
                       <article
                         key={task.taskKey}
-                        className={`${styles.pointageReviewTaskCard} ${styles.monthDetailTaskCard}`}
+                        className={styles.pointageReviewTaskCard}
                         aria-label={`SynthÃ¨se de ${task.taskTitle}`}
                       >
                         <h3 className={styles.pointageReviewTaskTitle}>{task.taskTitle}</h3>
@@ -3687,7 +3693,15 @@ export default function AccueilPage() {
             </div>
             <article className={`${styles.monthDetailEmptyCard} ${styles.pointageReviewMonthLikeScroll}`}>
               <div className={styles.monthDetailSummaryWrap}>
-                <div className={styles.monthDetailSummaryTotal}>
+                <div
+                  className={`${styles.monthDetailSummaryTotal} ${
+                    expectedDailyDurationMs !== null
+                      ? isValidationDailyTargetReached
+                        ? styles.monthDetailSummaryTotalReached
+                        : styles.monthDetailSummaryTotalMissed
+                      : ''
+                  }`}
+                >
                   {formatDuration(isYesterdayView ? viewedWorkTotalMs : displayedTotalWorkMs)}
                 </div>
                 <div className={`${styles.pointageReviewEntries} ${styles.monthDetailEntries}`}>
@@ -3707,9 +3721,7 @@ export default function AccueilPage() {
                           ))}
                         </div>
                       ) : null}
-                      <div className={styles.pointageReviewTaskDuration}>
-                        {entry.totalDurationLabel}
-                      </div>
+                      <div className={styles.pointageReviewTaskDuration}>{entry.totalDurationLabel}</div>
                     </article>
                   ))}
                 </div>

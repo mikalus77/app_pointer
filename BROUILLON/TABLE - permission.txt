@@ -1,0 +1,34 @@
+ACCES_ESPACE_PERSONNEL (mon agenda ; mon pointage ; mes tâches ; mes demandes ; paramètres)
+GERER_TACHES (Suivi des activités -> gestion des tâches)
+GERER_DEMANDES (Suivi des activités -> gestion des demandes)
+GERER_POINTAGES (Suivi des activités -> gestion des pointages)
+GERER_UTILISATEURS (Vue "Utilisateurs")
+GERER_DONNEES (Configuration)
+
+----------------------------------------------------------------------------------------------------------
+
+PERMISSION(
+  id_permission,
+  code_permission,
+  libelle_permission,
+  actif
+)
+
+----------------------------------------------------------------------------------------------------------
+
+create table permission (
+  id_permission bigint generated always as identity primary key,
+  code_permission varchar(90) not null unique,
+  libelle_permission varchar(140) not null,
+  actif boolean not null default true
+);
+
+----------------------------------------------------------------------------------------------------------
+
+insert into permission (code_permission, libelle_permission)
+values ('ACCES_ESPACE_PERSONNEL', 'Accéder à son espace personnel sur le logiciel'),
+       ('GERER_TACHES', 'Gérer les différentes tâches des utilisateurs'),
+       ('GERER_DEMANDES', 'Gérer les demandes des utilisateurs'),
+       ('GERER_POINTAGES', 'Gérer les pointages douteux'),
+       ('GERER_UTILISATEURS', 'Gérer les utilisateurs du logiciel'),
+       ('GERER_DONNEES', 'Gérer les données du logiciel');

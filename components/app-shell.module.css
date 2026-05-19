@@ -1,0 +1,453 @@
+.page {
+  --topbar-height: 59px;
+  --middle-zone-height: calc(var(--topbar-height) * 1.039);
+  --soft-light-gray: #e6eaef;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.topBar {
+  display: flex;
+  width: 100%;
+  min-height: var(--topbar-height);
+  background-color: #f5f7fa;
+}
+
+.brandArea {
+  flex: 0 0 80%;
+  background-color: #16365f;
+  background-image:
+    linear-gradient(
+      110deg,
+      rgba(133, 202, 255, 0.2) 0%,
+      rgba(133, 202, 255, 0.05) 26%,
+      rgba(25, 58, 99, 0.08) 55%,
+      rgba(16, 38, 68, 0.22) 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(170, 220, 255, 0.12) 0 1px,
+      transparent 2px 22px
+    );
+  background-size: 100% 100%, 260px 100%;
+  position: relative;
+  overflow: hidden;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 34px) 100%, 0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2rem 0 1.5rem;
+}
+
+.brandTitle {
+  position: relative;
+  z-index: 3;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(1.26rem, 2.25vw, 1.83rem);
+  font-family: "Poppins", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.brandArea::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -42%;
+  width: 42%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #9fdbff 45%, #d6f2ff 100%);
+  box-shadow: 0 0 10px rgba(159, 219, 255, 0.7);
+  animation: cometLeft 3.2s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.brandArea::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -42%;
+  width: 42%;
+  height: 2px;
+  background: linear-gradient(270deg, transparent 0%, #9fdbff 45%, #d6f2ff 100%);
+  box-shadow: 0 0 10px rgba(159, 219, 255, 0.7);
+  animation: cometRight 3.2s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.profileArea {
+  flex: 0 0 20%;
+  background-color: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  position: relative;
+  padding: 0 1.5rem;
+}
+
+.profileMenuWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.profileName {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1a3a6e;
+  font-family: "Poppins", sans-serif;
+  font-size: 20.1px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.profileButton {
+  cursor: pointer;
+}
+
+.profileIcon {
+  width: 34px;
+  height: 34px;
+  border: 2px solid #1a3a6e;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.iconHead {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #1a3a6e;
+  border-radius: 50%;
+}
+
+.iconBody {
+  width: 19px;
+  height: 9px;
+  border: 2px solid #0b1f3b;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border-bottom: 0;
+  margin-top: 0;
+}
+
+.profileDropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: -0.4rem;
+  min-width: 150px;
+  background-color: #f5f7fa;
+  border: 1px solid #d9e2ec;
+  box-shadow: 0 8px 18px rgba(20, 35, 58, 0.12);
+  border-radius: 10px;
+  padding: 0.35rem;
+  z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+}
+
+.profileMenuWrap:hover .profileDropdown {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.profileDropdownItem {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #1f2430;
+  font-family: "Poppins", sans-serif;
+  font-size: 0.94rem;
+  text-align: left;
+  white-space: nowrap;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  border-radius: 7px;
+}
+
+.profileDropdownItem:hover {
+  background-color: #e9eff5;
+}
+
+.middleZone {
+  width: 100%;
+  min-height: var(--middle-zone-height);
+  background-color: var(--soft-light-gray);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.middleContent {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
+  padding-left: 9px;
+  box-sizing: border-box;
+}
+
+.tabStrip {
+  width: calc(20% - 9px);
+  min-height: 42px;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.tabButton {
+  flex: 1 1 50%;
+  border: 0;
+  background-color: var(--soft-light-gray);
+  color: #2a3342;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.3px;
+  font-weight: 500;
+  padding: 0.5rem 0.85rem;
+  text-align: center;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  cursor: pointer;
+}
+
+.tabButtonActive {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+
+.layout {
+  display: flex;
+  height: calc(100vh - var(--topbar-height) - var(--middle-zone-height));
+  width: 100%;
+  overflow: hidden;
+}
+
+.menuZone {
+  flex: 0 0 20%;
+  background-color: #f5f7fa;
+  color: #1f2430;
+  font-family: "Poppins", sans-serif;
+  border-right: 9px solid var(--soft-light-gray);
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.verticalMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.usersPane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.usersHelperText {
+  margin: 0;
+  color: #5f7690;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.usersList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.userItem {
+  list-style: none;
+}
+
+.userButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #d6e0eb;
+  border-radius: 10px;
+  background-color: #fbfdff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.userButton:hover {
+  border-color: #b5c9df;
+  background-color: #f5f9fe;
+}
+
+.userButtonActive {
+  border-color: #2b4f7e;
+  background-color: #eaf0f7;
+}
+
+.userIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: linear-gradient(180deg, #e7eef7 0%, #dbe6f3 100%);
+  border: 1px solid #9ab4d2;
+}
+
+.userIconHead {
+  width: 7px;
+  height: 7px;
+  border: 1.6px solid #1f3f66;
+  border-radius: 50%;
+}
+
+.userIconBody {
+  width: 11px;
+  height: 5px;
+  border: 1.6px solid #1f3f66;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  border-bottom: 0;
+}
+
+.userLabel {
+  color: #2f4f74;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.6px;
+  font-weight: 550;
+  line-height: 1.25;
+}
+
+.menuItem {
+  width: 100%;
+  background-color: transparent;
+  border: 2px solid transparent;
+  color: #1f2430;
+  font-family: "Poppins", sans-serif;
+  font-size: 16.8px;
+  font-weight: 540;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  color: #3f5d7d;
+}
+
+.menuItemActive {
+  border-color: #2b4f7e;
+  background-color: #eaf0f7;
+  color: #3f5d7d;
+}
+
+.subMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.05rem;
+  margin-left: 1.65rem;
+}
+
+.subMenuItem {
+  width: 100%;
+  border: 2px solid transparent;
+  background-color: transparent;
+  color: #2f3a4a;
+  font-family: "Poppins", sans-serif;
+  font-size: 15.2px;
+  font-weight: 500;
+  text-align: left;
+  padding: 8px 18px;
+  cursor: pointer;
+  border-radius: 9px;
+}
+
+.subMenuItem:hover {
+  color: #3f5d7d;
+}
+
+.subMenuItemActive {
+  border-color: #2b4f7e;
+  background-color: #eaf0f7;
+  color: #3f5d7d;
+}
+
+.actionZone {
+  flex: 0 0 80%;
+  background-color: #f5f7fa;
+  color: #1f2430;
+  font-family: "Poppins", sans-serif;
+  padding: 24px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.actionZoneCentered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes cometLeft {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(103.6%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(103.6%);
+    opacity: 0;
+  }
+}
+
+@keyframes cometRight {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-105%);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-105%);
+    opacity: 0;
+  }
+}
+

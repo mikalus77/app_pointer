@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Jarvis Time",
-  description: "Application de pointage et de suivi d'activites",
+  description: "Application de pointage et de suivi d'activités",
 };
 
 export default function RootLayout({
@@ -12,7 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" translate="no" className="h-full antialiased notranslate">
+    <html
+      lang="fr"
+      translate="no"
+      className="h-full antialiased notranslate"
+    >
       <head>
         <meta name="google" content="notranslate" />
       </head>

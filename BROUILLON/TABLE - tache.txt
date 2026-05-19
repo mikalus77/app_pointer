@@ -4,7 +4,8 @@ TACHE(
   titre_tache,
   description_tache,
   date_creation_tache,
-  actif
+  actif,
+  tache_systeme
 )
 
 -------------------------------------------------------------------------------------------------
@@ -16,6 +17,7 @@ create table tache (
   description_tache text,
   date_creation_tache timestamp not null default now(),
   actif boolean not null default true,
+  tache_systeme boolean not null default false,
 
   constraint fk_tache_utilisateur_createur
     foreign key (id_utilisateur_createur)

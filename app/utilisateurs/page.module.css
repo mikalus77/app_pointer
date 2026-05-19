@@ -1,0 +1,30 @@
+.usersTabStrip {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  gap: 8px;
+}
+
+.usersTabButton {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #b8cbe4;
+  border-radius: 12px 12px 0 0;
+  background: transparent;
+  color: #2d4f78;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.usersTabButtonActive {
+  background: #f6f9fd;
+}
+
+.zoneLabel {
+  color: #2b4d75;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}

@@ -10,7 +10,8 @@ UTILISATEUR(
   heure_min_pointage,
   heure_max_pointage,
   date_creation_utilisateur,
-  actif
+  actif,
+  duree_journaliere_attendue_utilisateur
 )
 
 ---------------------------------------------------------------------------------------------------------------
@@ -27,7 +28,8 @@ create table utilisateur (
   heure_min_pointage time not null default '06:00:00',
   heure_max_pointage time not null default '22:00:00',
   date_creation_utilisateur timestamp not null default now(),
-  actif boolean not null default true
+  actif boolean not null default true,
+  duree_journaliere_attendue_utilisateur integer not null default 420
 );
 
 ---------------------------------------------------------------------------------------------------------------

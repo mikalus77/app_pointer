@@ -1,0 +1,22 @@
+STATUT_UTILISATEUR(
+  id_statut_utilisateur,
+  code_statut_utilisateur,
+  libelle_statut_utilisateur,
+  actif
+)
+
+-------------------------------------------------------------------------------------------------------------
+
+create table statut_utilisateur (
+  id_statut_utilisateur bigint generated always as identity primary key,
+  code_statut_utilisateur varchar(40) not null unique,
+  libelle_statut_utilisateur varchar(90) not null,
+  actif boolean not null default true
+);
+
+-------------------------------------------------------------------------------------------------------------
+
+insert into statut_utilisateur (code_statut_utilisateur, libelle_statut_utilisateur)
+values ('EN_ATTENTE', 'Compte utilisateur en attente de validation'),
+       ('ACTIF', 'Compte utilisateur actif'),
+       ('DESACTIVE', 'Compte utilisateur désactivé');

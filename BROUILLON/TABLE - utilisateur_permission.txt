@@ -1,0 +1,23 @@
+UTILISATEUR_PERMISSION(
+  id_utilisateur,
+  id_permission
+)
+
+---------------------------------------------------------------------------------------------------------------
+
+create table utilisateur_permission (
+  id_utilisateur bigint not null,
+  id_permission bigint not null,
+
+  primary key (id_utilisateur, id_permission),
+
+  constraint fk_utilisateur_permission_utilisateur
+    foreign key (id_utilisateur)
+    references utilisateur(id_utilisateur),
+
+  constraint fk_utilisateur_permission_permission
+    foreign key (id_permission)
+    references permission(id_permission)
+);
+
+---------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,15 @@
+JOUR_FERIE(
+  id_jour_ferie,
+  date_jour_ferie,
+  libelle_jour_ferie,
+  actif
+)
+
+-----------------------------------------------------------------------------------
+
+create table jour_ferie (
+  id_jour_ferie bigint generated always as identity primary key,
+  date_jour_ferie date not null unique,
+  libelle_jour_ferie varchar(140) not null,
+  actif boolean not null default true
+);

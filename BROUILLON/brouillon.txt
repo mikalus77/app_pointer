@@ -7,5 +7,20 @@ TYPES DEMANDE(MOTIFS)
 - RÉGULARISATION (RETARD, DÉPART ANTICIPÉ, ERREUR POINTAGE, OUBLI POINTAGE, AUTRE)*
 
 
-Lorsque "valider mon pointage" est cliqué, niveau affichage, réalise le même affichage que lorsqu'une cellule de l'onglet "mois" de la section "mon agenda" est cliqué, c'est-à-dire un 1er card avec écrit la date et un 2ème card beaucoup plus grand avec dans ce 2ème card le modèle de l'image ci-dessus (avec un bloc par tâche réalisée avec en haut à gauche le nom de la tâche et en bas à droite le nombre d'heures total cumulées à partir des durées de chaque session liée à cette tâche). Le bouton "X" est toujours là à la droite du 1er card. La nouveauté, ajoute un bouton "valider" en bas des deux cards. Comme avec l'onglet "mois" lorsqu'on a cet affichage tout le reste de l'écran est mis au second plan (flouté), et lorsqu'on clic sur le bouton "X" on revient à l'écran avant que "valider mon pointage" n'est été cliqué sans rien changer, et pour le moment rien ne se passe si on clic sur le bouton "valider". Et du coup annule les comportements actuels de "valider mon pointage" à savoir effacer l'affichage de MES TRAVAUX et MES PAUSES, ainsi que mettre TEMPS DE TRAVAIL et TEMPS DE PAUSE à 0.
+LES PERMISSIONS
 
+ACCES_ESPACE_PERSONNEL (mon agenda ; mon pointage ; mes tâches ; mes demandes)
+GERER_TACHES (ajouter/modifier/affecter/supprimer une tâche)
+GERER_DEMANDES (accepter/refuser une demande)
+GERER_POINTAGES (consulter, corriger et régulariser un pointage douteux)
+GERER_UTILISATEURS (avoir un visuel sur tous les utilisateurs du logiciel et effectuer n'importe quelle action sur l'un d'entre eux)
+GERER_DONNEES (avoir un visuel sur toutes les données de la base et effectuer des ajouts/update/delete)
+
+
+check variable télétravail et congé - à faire plus tard avec des tables dédiées
+
+---------------------------------------------------------------------------------------
+
+design calendrier (code couleur - jour fériés)
+gérer pas validation (oubli)
+on peut passer aux tâches
