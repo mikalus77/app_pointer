@@ -73,60 +73,77 @@ function findRoleInUnknown(value: unknown): 'ADMIN' | 'EMPLOYE' | null {
 }
 
 async function resolveRoleFromLinkTable(userId: number) {
-  let userRole: 'ADMIN' | 'EMPLOYE' = 'EMPLOYE'
+  try {
+    const { data: roleLinkRows } = await supabase
+      .from('utilisateur_role')
+      .select('*')
+      .eq('id_utilisateur', userId)
+      .limit(10)
 
-  const { data: roleLinkRows } = await supabase
-    .from('utilisateur_role')
-    .select('*')
-    .eq('id_utilisateur', userId)
-    .limit(10)
-
-  if (!Array.isArray(roleLinkRows) || roleLinkRows.length === 0) {
-    return userRole
-  }
-
-  // 1) Try to find role code directly in mapping row(s)
-  for (const roleRow of roleLinkRows) {
-    const directRole =
-      extractRoleCode(roleRow as Record<string, unknown>) ?? findRoleInUnknown(roleRow)
-    if (directRole) {
-      return directRole
+    if (!Array.isArray(roleLinkRows) || roleLinkRows.length === 0) {
+      return 'EMPLOYE' as const
     }
-  }
 
-  // 2) Try to resolve by numeric FK(s) against likely role tables
-  const numericRoleIds = new Set<number>()
-  for (const roleRow of roleLinkRows) {
-    if (!roleRow || typeof roleRow !== 'object') continue
-    for (const [key, value] of Object.entries(roleRow as Record<string, unknown>)) {
-      const normalizedKey = key.toLowerCase()
-      if (!normalizedKey.includes('role')) continue
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        numericRoleIds.add(value)
+    // 1) Code role directly present on mapping rows
+    for (const roleRow of roleLinkRows) {
+      const resolved = extractRoleCode(roleRow as Record<string, unknown>) ?? findRoleInUnknown(roleRow)
+      if (resolved) {
+        return resolved
       }
     }
-  }
 
-  const candidateTables = ['role_utilisateur', 'role', 'utilisateur_roles']
-  const candidateIdColumns = ['id_role_utilisateur', 'id_role', 'id_utilisateur_role']
+    // 2) Try known nested relations (if declared in PostgREST schema)
+    const relationSelects = [
+      '*, role_utilisateur(*)',
+      '*, utilisateur_role(*)',
+      '*, role(*)',
+    ]
+    for (const selectSpec of relationSelects) {
+      const { data: linkedRows, error } = await supabase
+        .from('utilisateur_role')
+        .select(selectSpec)
+        .eq('id_utilisateur', userId)
+        .limit(10)
+      if (error || !Array.isArray(linkedRows)) continue
+      for (const row of linkedRows) {
+        const resolved = findRoleInUnknown(row)
+        if (resolved) return resolved
+      }
+    }
 
-  for (const roleId of numericRoleIds) {
-    for (const tableName of candidateTables) {
-      for (const idColumn of candidateIdColumns) {
-        const { data } = await supabase
-          .from(tableName)
-          .select('*')
-          .eq(idColumn, roleId)
-          .maybeSingle()
-        const resolved = findRoleInUnknown(data)
-        if (resolved) {
-          return resolved
+    // 3) Resolve numeric role ids via common lookup table names
+    const numericRoleIds = new Set<number>()
+    for (const roleRow of roleLinkRows) {
+      if (!roleRow || typeof roleRow !== 'object') continue
+      for (const [key, value] of Object.entries(roleRow as Record<string, unknown>)) {
+        if (!key.toLowerCase().includes('role')) continue
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          numericRoleIds.add(value)
         }
       }
     }
-  }
 
-  return userRole
+    const candidateTables = ['role_utilisateur', 'utilisateur_role_type', 'role']
+    const candidateIdColumns = ['id_role_utilisateur', 'id_utilisateur_role', 'id_role']
+    for (const roleId of numericRoleIds) {
+      for (const tableName of candidateTables) {
+        for (const idColumn of candidateIdColumns) {
+          const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .eq(idColumn, roleId)
+            .maybeSingle()
+          if (error || !data) continue
+          const resolved = findRoleInUnknown(data)
+          if (resolved) return resolved
+        }
+      }
+    }
+
+    return 'EMPLOYE' as const
+  } catch {
+    return 'EMPLOYE' as const
+  }
 }
 
 export async function POST(request: Request) {
@@ -220,7 +237,8 @@ export async function POST(request: Request) {
     response.cookies.set(SESSION_COOKIE_NAME, token, buildSessionCookieOptions(expiresAt))
 
     return response
-  } catch {
+  } catch (error) {
+    console.error('Login route error:', error)
     return NextResponse.json({ error: 'Impossible de creer la session !' }, { status: 500 })
   }
 }
