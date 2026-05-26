@@ -1,0 +1,29 @@
+PRIORITE_TACHE(
+  id_priorite_tache,
+  code_priorite_tache,
+  niveau_priorite_tache,
+  actif
+)
+
+-------------------------------------------------------------------------------------------------
+
+create table priorite_tache (
+  id_priorite_tache bigint generated always as identity primary key,
+  code_priorite_tache varchar(60) not null unique,
+  niveau_priorite_tache integer not null unique,
+  actif boolean not null default true,
+
+  constraint priorite_tache_code_uppercase
+    check (code_priorite_tache = upper(code_priorite_tache)),
+
+  constraint priorite_tache_niveau_positif
+    check (niveau_priorite_tache > 0)
+);
+
+-------------------------------------------------------------------------------------------------
+
+insert into priorite_tache (code_priorite_tache, niveau_priorite_tache)
+values ('BASSE', 1),
+       ('MOYENNE', 2),
+       ('HAUTE', 3),
+       ('URGENTE', 4);

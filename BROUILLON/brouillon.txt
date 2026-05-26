@@ -7,20 +7,16 @@ TYPES DEMANDE(MOTIFS)
 - RÉGULARISATION (RETARD, DÉPART ANTICIPÉ, ERREUR POINTAGE, OUBLI POINTAGE, AUTRE)*
 
 
-LES PERMISSIONS
-
-ACCES_ESPACE_PERSONNEL (mon agenda ; mon pointage ; mes tâches ; mes demandes)
-GERER_TACHES (ajouter/modifier/affecter/supprimer une tâche)
-GERER_DEMANDES (accepter/refuser une demande)
-GERER_POINTAGES (consulter, corriger et régulariser un pointage douteux)
-GERER_UTILISATEURS (avoir un visuel sur tous les utilisateurs du logiciel et effectuer n'importe quelle action sur l'un d'entre eux)
-GERER_DONNEES (avoir un visuel sur toutes les données de la base et effectuer des ajouts/update/delete)
-
 
 check variable télétravail et congé - à faire plus tard avec des tables dédiées
 
 ---------------------------------------------------------------------------------------
 
-design calendrier (code couleur - jour fériés)
-gérer pas validation (oubli)
-on peut passer aux tâches
+- Mettre en ordre la base
+- instaurer les RLS
+- déployer
+
+Tout en haut à gauche place un bouton qui a trois comportement différents :'approuver le compte' en vert (lorsque statut_utilisateur = en_attente), une fois cliqué le compte passe en active ; desactiver en rouge (lorsque statut_utilisateur = active), une fois cliqué le compte passe en desactive ; activer en vert (lorsque statut_utilisateur = desactive) une fois cliqué le compte repasse en active. Toujours en haut mais sur la droite cette fois ci, place un 'compte créé le dd/mm/aaaa' avec la date de création en base.
+
+ 
+

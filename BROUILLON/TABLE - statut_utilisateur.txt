@@ -18,5 +18,5 @@ create table statut_utilisateur (
 
 insert into statut_utilisateur (code_statut_utilisateur, libelle_statut_utilisateur)
 values ('EN_ATTENTE', 'Compte utilisateur en attente de validation'),
-       ('ACTIF', 'Compte utilisateur actif'),
+       ('ACTIVE', 'Compte utilisateur actif'),
        ('DESACTIVE', 'Compte utilisateur désactivé');

@@ -341,6 +341,49 @@
   font-size: 14.6px;
   font-weight: 550;
   line-height: 1.25;
+  flex: 1 1 auto;
+}
+
+.userStatusWrap {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+}
+
+.userStatusDot {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  display: inline-block;
+  border: 1px solid rgba(21, 39, 62, 0.3);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.92),
+    0 0 0 3px rgba(31, 63, 102, 0.12);
+}
+
+.userStatusDotOnline {
+  background:
+    radial-gradient(circle at 35% 35%, #7ff1ab 0%, #29be63 55%, #1f9a50 100%);
+}
+
+.userStatusDotOffline {
+  background:
+    radial-gradient(circle at 35% 35%, #ff9c9c 0%, #e35353 55%, #c43a3a 100%);
+}
+
+.userStatusBadge {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.userStatusPending {
+  filter: saturate(1.1);
+}
+
+.userStatusDisabled {
+  filter: saturate(1.1);
 }
 
 .menuItem {

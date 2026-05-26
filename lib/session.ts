@@ -7,6 +7,7 @@ export const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 export type AppSession = {
   userId: number
   username: string
+  role: 'ADMIN' | 'EMPLOYE'
   expiresAt: number
 }
 
@@ -86,6 +87,7 @@ export async function verifySessionToken(token: string | undefined | null) {
     if (
       typeof parsedPayload.userId !== 'number' ||
       typeof parsedPayload.username !== 'string' ||
+      (parsedPayload.role !== 'ADMIN' && parsedPayload.role !== 'EMPLOYE') ||
       typeof parsedPayload.expiresAt !== 'number'
     ) {
       return null

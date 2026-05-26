@@ -5,7 +5,8 @@ TACHE(
   description_tache,
   date_creation_tache,
   actif,
-  tache_systeme
+  tache_systeme,
+  id_priorite_tache
 )
 
 -------------------------------------------------------------------------------------------------
@@ -18,10 +19,15 @@ create table tache (
   date_creation_tache timestamp not null default now(),
   actif boolean not null default true,
   tache_systeme boolean not null default false,
+  id_priorite_tache bigint
 
   constraint fk_tache_utilisateur_createur
     foreign key (id_utilisateur_createur)
     references utilisateur(id_utilisateur)
+
+  constraint fk_tache_priorite_tache
+    foreign key (id_priorite_tache)
+    references priorite_tache(id_priorite_tache);
 );
 
 -------------------------------------------------------------------------------------------------

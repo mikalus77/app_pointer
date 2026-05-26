@@ -1,0 +1,22 @@
+MOTIF_ARRET_SESSION(
+  id_motif_arret_session,
+  code_motif_arret_session,
+  libelle_motif_arret_session,
+  actif
+)
+
+-------------------------------------------------------------------------------------------------
+
+create table motif_arret_session (
+  id_motif_arret_session bigint generated always as identity primary key,
+  code_motif_arret_session varchar(60) not null unique,
+  libelle_motif_arret_session varchar(140) not null,
+  actif boolean not null default true
+);
+
+-------------------------------------------------------------------------------------------------
+
+insert into motif_arret_session (code_motif_arret_session, libelle_motif_arret_session)
+values ('ARRET_MANUEL', 'Arrêt manuel de la session'),
+       ('INACTIVITE', 'Session arrêtée pour inactivité'),
+       ('ARRET_AUTO', 'Arrêt automatique de la session');

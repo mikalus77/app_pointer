@@ -12,8 +12,9 @@ const CONNECTED_USERNAME_STORAGE_KEY = 'app_pointer_connected_username'
 const UI_STATE_CHANGED_EVENT = 'app_pointer_ui_state_changed'
 const CONNECTED_USERNAME_CHANGED_EVENT = 'app_pointer_connected_username_changed'
 const OTHER_TASK_LABEL = 'Autre tÃ¢che'
-const WORK_OFFLINE_GRACE_MINUTES = 10
-const PAUSE_AUTO_STOP_MINUTES = 70
+const WORK_OFFLINE_GRACE_MINUTES = 5
+const PAUSE_AUTO_STOP_MINUTES = 65
+const NON_MANUAL_STOP_REASON_CODES = new Set(['ARRET_AUTO', 'INACTIVITE'])
 
 type WorkSessionEntry = {
   sessionId: number
@@ -69,6 +70,21 @@ type DaySummary = {
   dateStamp: string
   totalWorkMs: number
   tasks: DayTaskSummary[]
+}
+
+type PointageBoundsOverlayState = {
+  dateLabel: string
+  startTimeLabel: string
+  endTimeLabel: string
+}
+
+type TaskSessionsOverlayState = {
+  taskTitle: string
+  sessions: Array<{
+    startLabel: string
+    endLabel: string
+    stopReasonLabel: string | null
+  }>
 }
 
 type PointageApiResult<T> =
@@ -292,9 +308,48 @@ function splitCommentLines(comment: string) {
     .filter((line) => line.length > 0)
 }
 
+function getNonManualStopReasonLabel(
+  code: string | null | undefined,
+  label: string | null | undefined
+) {
+  if (!code || !label || !NON_MANUAL_STOP_REASON_CODES.has(code)) {
+    return null
+  }
+
+  return label.toUpperCase()
+}
+
 function capitalizeFirstLetter(value: string) {
   if (!value) return value
   return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function parseUnknownDate(value: unknown) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null
+  }
+
+  const normalizedValue = value.trim()
+  const dateOnlyMatch = normalizedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    return new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      23,
+      59,
+      59,
+      999
+    )
+  }
+
+  const parsed = new Date(normalizedValue)
+  if (Number.isNaN(parsed.getTime())) {
+    return null
+  }
+
+  return parsed
 }
 
 function readStoredUiState() {
@@ -427,6 +482,8 @@ export default function AccueilPage() {
   const [workElapsedMs, setWorkElapsedMs] = useState(0)
   const [pauseElapsedMs, setPauseElapsedMs] = useState(0)
   const [monthDetailDate, setMonthDetailDate] = useState<Date | null>(null)
+  const [pointageBoundsOverlay, setPointageBoundsOverlay] = useState<PointageBoundsOverlayState | null>(null)
+  const [taskSessionsOverlay, setTaskSessionsOverlay] = useState<TaskSessionsOverlayState | null>(null)
   const [pointageValidationPreviewDate, setPointageValidationPreviewDate] = useState<Date | null>(
     null
   )
@@ -434,6 +491,7 @@ export default function AccueilPage() {
   const [yesterdayPointageSnapshot, setYesterdayPointageSnapshot] =
     useState<PointageDaySnapshot | null>(null)
   const [connectedUserId, setConnectedUserId] = useState<number | null>(null)
+  const [connectedUserRole, setConnectedUserRole] = useState<'ADMIN' | 'EMPLOYE'>('EMPLOYE')
   const [expectedWeeklyDurationMs, setExpectedWeeklyDurationMs] = useState<number | null>(null)
   const [currentPointageId, setCurrentPointageId] = useState<number | null>(null)
   const [currentSessionPointageId, setCurrentSessionPointageId] = useState<number | null>(null)
@@ -484,6 +542,7 @@ export default function AccueilPage() {
         const sessionPayload = (await response.json()) as {
           userId?: number
           username?: string
+          role?: string
         }
 
         if (cancelled) {
@@ -493,6 +552,7 @@ export default function AccueilPage() {
         if (typeof sessionPayload.userId === 'number') {
           setConnectedUserId(sessionPayload.userId)
         }
+        setConnectedUserRole(sessionPayload.role === 'ADMIN' ? 'ADMIN' : 'EMPLOYE')
 
         if (typeof window !== 'undefined' && typeof sessionPayload.username === 'string') {
           if (window.localStorage.getItem(CONNECTED_USERNAME_STORAGE_KEY) !== sessionPayload.username) {
@@ -565,7 +625,7 @@ export default function AccueilPage() {
           body: JSON.stringify(body ?? {}),
         })
 
-        const payload = (await response.json().catch(() => null)) as
+        const payload = (await response.clone().json().catch(() => null)) as
           | { error?: string }
           | T
           | null
@@ -589,7 +649,7 @@ export default function AccueilPage() {
             error:
               payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
                 ? payload.error
-                : 'Une erreur est survenue.',
+                : `Erreur HTTP ${response.status}: ${(await response.text().catch(() => '')).trim() || 'réponse vide'}`,
           }
         }
 
@@ -597,10 +657,11 @@ export default function AccueilPage() {
           ok: true,
           data: payload as T,
         }
-      } catch {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue.'
         return {
           ok: false,
-          error: 'Une erreur est survenue.',
+          error: errorMessage || 'Une erreur est survenue.',
         }
       }
     },
@@ -924,6 +985,14 @@ export default function AccueilPage() {
     if (options?.configurationTab !== undefined) {
       setActiveConfigurationTab(options.configurationTab)
     }
+    if (menu === 'gestion_taches') {
+      router.push('/gestion-des-activites')
+      return
+    }
+    if (menu === 'taches') {
+      router.push('/taches')
+      return
+    }
     router.push('/accueil')
   }
 
@@ -985,9 +1054,9 @@ export default function AccueilPage() {
 
       const { data: userData, error: userError } = await supabase
         .from('utilisateur')
-        .select('id_utilisateur')
+        .select('id_utilisateur, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('username_utilisateur', connectedUsername)
-        .eq('actif', true)
+        .eq('id_statut_utilisateur.code_statut_utilisateur', 'ACTIVE')
         .single()
 
       if (userError || !userData) {
@@ -1097,9 +1166,9 @@ export default function AccueilPage() {
       const yesterdayDateStamp = getLocalDateStamp(yesterdayRef)
       const { data: userData, error: userError } = await supabase
         .from('utilisateur')
-        .select('id_utilisateur')
+        .select('id_utilisateur, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('username_utilisateur', connectedUsername)
-        .eq('actif', true)
+        .eq('id_statut_utilisateur.code_statut_utilisateur', 'ACTIVE')
         .single()
 
       if (cancelled || userError || !userData) {
@@ -1679,9 +1748,9 @@ export default function AccueilPage() {
 
       const { data: userData, error: userError } = await supabase
         .from('utilisateur')
-        .select('id_utilisateur')
+        .select('id_utilisateur, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('username_utilisateur', connectedUsername)
-        .eq('actif', true)
+        .eq('id_statut_utilisateur.code_statut_utilisateur', 'ACTIVE')
         .single()
 
       if (cancelled || userError || !userData) {
@@ -2085,6 +2154,128 @@ export default function AccueilPage() {
     monthDetailSummary !== null &&
     expectedDailyDurationMs !== null &&
     monthDetailSummary.totalWorkMs >= expectedDailyDurationMs
+
+  const openPointageBoundsOverlay = useCallback(
+    async (targetDate: Date) => {
+      if (!connectedUserId) {
+        return
+      }
+
+      const dateStamp = getLocalDateStamp(targetDate)
+      const { data: pointageRows, error: pointageError } = await supabase
+        .from('pointage')
+        .select('id_pointage')
+        .eq('id_utilisateur_pointeur', connectedUserId)
+        .eq('date_pointage', dateStamp)
+
+      if (pointageError || !pointageRows || pointageRows.length === 0) {
+        return
+      }
+
+      const pointageIds = pointageRows.map((row) => row.id_pointage)
+      const { data: sessionRows, error: sessionError } = await supabase
+        .from('session_pointage')
+        .select('debut_session_pointage, fin_session_pointage')
+        .in('id_pointage', pointageIds)
+        .not('fin_session_pointage', 'is', null)
+        .order('debut_session_pointage', { ascending: true })
+
+      if (sessionError || !sessionRows || sessionRows.length === 0) {
+        return
+      }
+
+      const firstSession = sessionRows[0]
+      const lastSession = sessionRows[sessionRows.length - 1]
+      if (!lastSession.fin_session_pointage) {
+        return
+      }
+
+      setPointageBoundsOverlay({
+        dateLabel: targetDate.toLocaleDateString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        }),
+        startTimeLabel: formatTimeLabel(firstSession.debut_session_pointage),
+        endTimeLabel: formatTimeLabel(lastSession.fin_session_pointage),
+      })
+    },
+    [connectedUserId]
+  )
+
+  const openTaskSessionsOverlay = useCallback(
+    async (targetDate: Date, task: DayTaskSummary) => {
+      if (!connectedUserId) {
+        return
+      }
+
+      const numericTaskId = Number(task.taskId)
+      if (!Number.isFinite(numericTaskId)) {
+        return
+      }
+
+      const dateStamp = getLocalDateStamp(targetDate)
+      const { data: pointageRows, error: pointageError } = await supabase
+        .from('pointage')
+        .select('id_pointage, libelle_tache_libre_pointage')
+        .eq('id_utilisateur_pointeur', connectedUserId)
+        .eq('date_pointage', dateStamp)
+        .eq('id_tache', numericTaskId)
+        .order('id_pointage', { ascending: true })
+
+      if (pointageError || !pointageRows || pointageRows.length === 0) {
+        return
+      }
+
+      const { data: taskRow } = await supabase
+        .from('tache')
+        .select('titre_tache')
+        .eq('id_tache', numericTaskId)
+        .single()
+
+      const pointageIds = pointageRows.map((row) => row.id_pointage)
+      const { data: sessionRows, error: sessionError } = await supabase
+        .from('session_pointage')
+        .select(
+          'id_pointage, debut_session_pointage, fin_session_pointage, motif_arret_session:motif_arret_session!fk_session_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
+        )
+        .in('id_pointage', pointageIds)
+        .not('fin_session_pointage', 'is', null)
+        .order('debut_session_pointage', { ascending: true })
+
+      if (sessionError || !sessionRows || sessionRows.length === 0) {
+        return
+      }
+
+      const freeTaskByPointageId = new Map<number, string | null>(
+        pointageRows.map((row) => [row.id_pointage, row.libelle_tache_libre_pointage])
+      )
+      const baseTaskTitle = taskRow?.titre_tache ?? ''
+      const matchedSessions = sessionRows.filter((session) => {
+        const freeLabel = freeTaskByPointageId.get(session.id_pointage) ?? null
+        return getResolvedTaskTitle(baseTaskTitle, freeLabel) === task.taskTitle
+      })
+
+      if (matchedSessions.length === 0) {
+        return
+      }
+
+      setTaskSessionsOverlay({
+        taskTitle: task.taskTitle,
+        sessions: matchedSessions
+          .filter((session) => !!session.fin_session_pointage)
+          .map((session) => ({
+            startLabel: formatTimeLabel(session.debut_session_pointage),
+            endLabel: formatTimeLabel(session.fin_session_pointage as string),
+            stopReasonLabel: getNonManualStopReasonLabel(
+              session.motif_arret_session?.code_motif_arret_session,
+              session.motif_arret_session?.libelle_motif_arret_session
+            ),
+          })),
+      })
+    },
+    [connectedUserId, getResolvedTaskTitle]
+  )
   const pointageReviewSourceSummary = useMemo(() => {
     const summary = summarizeWorkEntries(viewedWorkEntries)
     return {
@@ -2318,6 +2509,7 @@ export default function AccueilPage() {
       })
 
       if (!stopResult.ok) {
+        setPointageStopError(stopResult.error || "Impossible d'arrêter le pointage.")
         return false
       }
 
@@ -3043,7 +3235,7 @@ export default function AccueilPage() {
     setPointageStopError('')
     const didClose = await closeCurrentSession(pointageComment.trim() || null)
     if (!didClose) {
-      setPointageStopError("Impossible d'arrÃªter le pointage.")
+      setPointageStopError((previous) => previous || "Impossible d'arrêter le pointage.")
       setPointageMutationPending(false)
       return
     }
@@ -3182,7 +3374,6 @@ export default function AccueilPage() {
     gestion_pointages: 'Gestion des pointages',
     gestion_bdd: 'Configuration',
   }
-
   const prepareWorkResume = async (entry: WorkEntry) => {
     if (pointageMode !== 'idle' || pointageMutationPending) {
       return
@@ -3240,6 +3431,7 @@ export default function AccueilPage() {
     <>
       <AppShell
         connectedUsername={connectedUsername}
+        userRole={connectedUserRole}
         activeTab={activeTab}
         activeMenu={activeMenu}
         activeDemandesSubMenu={activeDemandesSubMenu}
@@ -3467,7 +3659,7 @@ export default function AccueilPage() {
                           >
                             {daySummary ? (
                               <div className={styles.daySummaryCard}>
-                                <div
+                                <button
                                   className={`${styles.daySummaryTotal} ${
                                     hasDailyTargetStatus
                                       ? isDailyTargetReached
@@ -3475,12 +3667,30 @@ export default function AccueilPage() {
                                         : styles.daySummaryTotalMissed
                                       : ''
                                   }`}
+                                  type="button"
+                                  onClick={() => {
+                                    void openPointageBoundsOverlay(day)
+                                  }}
                                 >
                                   {formatDuration(daySummary.totalWorkMs)}
-                                </div>
+                                </button>
                                 <div className={styles.daySummaryTasks}>
                                   {daySummary.tasks.map((task) => (
-                                    <div key={task.taskKey} className={styles.daySummaryTaskRow}>
+                                    <div
+                                      key={task.taskKey}
+                                      className={styles.daySummaryTaskRow}
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => {
+                                        void openTaskSessionsOverlay(day, task)
+                                      }}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter' || event.key === ' ') {
+                                          event.preventDefault()
+                                          void openTaskSessionsOverlay(day, task)
+                                        }
+                                      }}
+                                    >
                                       <div className={styles.daySummaryTaskMain}>
                                         <span className={styles.daySummaryTaskTitle}>{task.taskTitle}</span>
                                         <span className={styles.daySummaryTaskDuration}>
@@ -3491,7 +3701,7 @@ export default function AccueilPage() {
                                         <div className={styles.daySummaryTaskComment}>
                                           {splitCommentLines(task.comment).map((line, index) => (
                                             <div key={`${task.taskKey}-comment-${index}`} className={styles.commentLine}>
-                                              <span className={styles.commentMarker}>â–¸</span> {line}
+                                              <span className={styles.commentMarker}>&gt;</span> {line}
                                             </div>
                                           ))}
                                         </div>
@@ -3613,7 +3823,7 @@ export default function AccueilPage() {
             <article className={styles.monthDetailEmptyCard}>
               {monthDetailSummary ? (
                 <div className={styles.monthDetailSummaryWrap}>
-                  <div
+                  <button
                     className={`${styles.monthDetailSummaryTotal} ${
                       monthDetailHasDailyTargetStatus
                         ? monthDetailDailyTargetReached
@@ -3621,22 +3831,37 @@ export default function AccueilPage() {
                           : styles.monthDetailSummaryTotalMissed
                         : ''
                     }`}
+                    type="button"
+                    onClick={() => {
+                      void openPointageBoundsOverlay(monthDetailDate)
+                    }}
                   >
                     {formatDuration(monthDetailSummary.totalWorkMs)}
-                  </div>
+                  </button>
                   <div className={`${styles.pointageReviewEntries} ${styles.monthDetailEntries}`}>
                     {monthDetailSummary.tasks.map((task) => (
                       <article
                         key={task.taskKey}
                         className={`${styles.pointageReviewTaskCard} ${styles.monthDetailTaskCard}`}
                         aria-label={`SynthÃ¨se de ${task.taskTitle}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          void openTaskSessionsOverlay(monthDetailDate, task)
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            void openTaskSessionsOverlay(monthDetailDate, task)
+                          }
+                        }}
                       >
                         <h3 className={styles.pointageReviewTaskTitle}>{task.taskTitle}</h3>
                         {task.comment !== '-' ? (
                           <div className={styles.pointageReviewTaskComment}>
                             {splitCommentLines(task.comment).map((line, index) => (
                               <div key={`${task.taskKey}-review-comment-${index}`} className={styles.commentLine}>
-                                <span className={styles.commentMarker}>â–¸</span> {line}
+                                <span className={styles.commentMarker}>&gt;</span> {line}
                               </div>
                             ))}
                           </div>
@@ -3702,7 +3927,7 @@ export default function AccueilPage() {
                         <div className={styles.pointageReviewTaskComment}>
                           {splitCommentLines(entry.comment).map((line, index) => (
                             <div key={`${entry.pointageId}-comment-${index}`} className={styles.commentLine}>
-                              <span className={styles.commentMarker}>â–¸</span> {line}
+                              <span className={styles.commentMarker}>&gt;</span> {line}
                             </div>
                           ))}
                         </div>
@@ -3726,8 +3951,70 @@ export default function AccueilPage() {
           </div>
         </div>
       ) : null}
+      {pointageBoundsOverlay ? (
+        <div className={styles.monthDetailOverlay} onClick={() => setPointageBoundsOverlay(null)}>
+          <div
+            className={styles.pointageBoundsPanel}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Heures de pointage de la journée"
+          >
+            <button
+              type="button"
+              className={styles.pointageBoundsClose}
+              aria-label="Fermer le détail des heures de pointage"
+              onClick={() => setPointageBoundsOverlay(null)}
+            >
+              &times;
+            </button>
+            <p className={styles.pointageBoundsDate}>{pointageBoundsOverlay.dateLabel}</p>
+            <p className={styles.pointageBoundsLine}>
+              <strong>Début pointage :</strong> {pointageBoundsOverlay.startTimeLabel}
+            </p>
+            <p className={styles.pointageBoundsLine}>
+              <strong>Fin pointage :</strong> {pointageBoundsOverlay.endTimeLabel}
+            </p>
+          </div>
+        </div>
+      ) : null}
+      {taskSessionsOverlay ? (
+        <div className={styles.monthDetailOverlay} onClick={() => setTaskSessionsOverlay(null)}>
+          <div
+            className={`${styles.pointageBoundsPanel} ${styles.taskSessionsPanel}`}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sessions de la tâche"
+          >
+            <button
+              type="button"
+              className={styles.pointageBoundsClose}
+              aria-label="Fermer le détail des sessions"
+              onClick={() => setTaskSessionsOverlay(null)}
+            >
+              &times;
+            </button>
+            <p className={styles.pointageBoundsDate}>{taskSessionsOverlay.taskTitle}</p>
+            {taskSessionsOverlay.sessions.map((session, index) => (
+              <p
+                key={`${session.startLabel}-${session.endLabel}-${index}`}
+                className={`${styles.pointageBoundsLine} ${styles.taskSessionLine}`}
+              >
+                <strong>{`Session ${index + 1}`}</strong> : {session.startLabel} - {session.endLabel}
+                {session.stopReasonLabel ? (
+                  <span className={styles.pointageBoundsStopReason}>
+                    {` (${session.stopReasonLabel})`}
+                  </span>
+                ) : null}
+              </p>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
+
 
 

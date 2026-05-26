@@ -66,7 +66,6 @@ export async function POST(request: Request) {
       .from('statut_pointage')
       .select('id_statut_pointage')
       .eq('code_statut_pointage', 'EN_COURS')
-      .eq('actif', true)
       .single()
 
     if (statusError || !statusRow) {

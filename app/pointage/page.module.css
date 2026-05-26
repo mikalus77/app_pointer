@@ -1,4 +1,4 @@
-.page {
+﻿.page {
   --topbar-height: 59px;
   --middle-zone-height: calc(var(--topbar-height) * 1.039);
   --soft-light-gray: #e6eaef;
@@ -233,15 +233,31 @@
   display: flex;
   align-items: flex-end;
   gap: 0;
-  width: 80%;
+  width: fit-content;
   min-height: 42px;
   box-sizing: border-box;
 }
 
 .agendaTabStrip .tabButton {
   flex: 0 0 auto;
-  min-width: 190px;
+  min-width: 180px;
+  border: 0;
+  background-color: var(--soft-light-gray);
+  color: #2a3342;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.3px;
+  font-weight: 500;
   padding: 0.5rem 0.7rem;
+  text-align: center;
+  white-space: nowrap;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  cursor: pointer;
+}
+
+.agendaTabStrip .tabButton.tabButtonActive {
+  background-color: #f5f7fa;
+  font-weight: 600;
 }
 
 .agendaHeader {
@@ -992,15 +1008,17 @@
 }
 
 .tabButton {
-  flex: 1 1 50%;
+  flex: 0 0 auto;
+  min-width: 84px;
   border: 0;
   background-color: var(--soft-light-gray);
   color: #2a3342;
   font-family: "Poppins", sans-serif;
   font-size: 14.3px;
   font-weight: 500;
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.7rem;
   text-align: center;
+  white-space: nowrap;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
   cursor: pointer;
@@ -1316,6 +1334,21 @@
   box-shadow: 0 2px 8px rgba(33, 67, 107, 0.06);
 }
 
+.pointageAutoValidatedNotice {
+  width: 794px;
+  margin: 2px auto 0;
+  border: 1px solid #b9cde3;
+  border-radius: 12px;
+  background-color: #eef4fb;
+  color: #2f5c89;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
 .pointageWrapIdle {
   width: 794px;
 }
@@ -1485,6 +1518,74 @@
   border-color: #d89b9b;
   color: #8f2d2d;
   background-color: #fff1f1;
+}
+
+.inactivityToast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  width: 320px;
+  border: 1px solid #a9bfd7;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 16px 32px rgba(15, 35, 62, 0.26);
+  z-index: 90;
+  background-color: #ffffff;
+}
+
+.inactivityToastHeader {
+  background: #16365f;
+  color: #f5f8fd;
+  font-family: "Poppins", sans-serif;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.inactivityToastBody {
+  padding: 12px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  background-color: #ffffff;
+}
+
+.inactivityToastMessage {
+  margin: 0 0 4px;
+  color: #2f5c89;
+  font-family: "Poppins", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.inactivityActionBtn {
+  width: 72%;
+  min-height: 40px;
+  border-radius: 10px;
+  font-family: "Poppins", sans-serif;
+  font-size: 13.6px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  padding: 0 6px;
+  align-self: center;
+}
+
+.inactivityContinueBtn {
+  border-color: #36a168;
+  background-color: #eaf8f0;
+  color: #1f7d4a;
+}
+
+.inactivityStopBtn {
+  border-color: #d89b9b;
+  background-color: #fff1f1;
+  color: #8f2d2d;
 }
 
 .pointageRowPause {
@@ -1701,7 +1802,10 @@
 }
 
 .workHistoryComment {
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
+  gap: 4px;
   color: #2f5c89;
   font-family: "Poppins", sans-serif;
   font-size: 14.8px;
@@ -1709,6 +1813,17 @@
   font-style: italic;
   line-height: 1.40;
   word-break: break-word;
+  text-align: center;
+}
+
+.stopReasonAlert {
+  display: block;
+  color: #d21d25;
+  font-family: inherit;
+  font-size: 0.9em;
+  font-style: inherit;
+  font-weight: inherit;
+  text-transform: uppercase;
 }
 
 .workHistoryActions {
@@ -2049,3 +2164,4 @@
     grid-template-columns: repeat(7, minmax(140px, 1fr));
   }
 }
+

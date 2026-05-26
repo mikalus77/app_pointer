@@ -12,8 +12,13 @@ const CONNECTED_USERNAME_STORAGE_KEY = 'app_pointer_connected_username'
 const UI_STATE_CHANGED_EVENT = 'app_pointer_ui_state_changed'
 const CONNECTED_USERNAME_CHANGED_EVENT = 'app_pointer_connected_username_changed'
 const OTHER_TASK_LABEL = 'Autre tÃ¢che'
-const WORK_OFFLINE_GRACE_MINUTES = 10
-const PAUSE_AUTO_STOP_MINUTES = 70
+const WORK_OFFLINE_GRACE_MINUTES = 5
+const PAUSE_AUTO_STOP_MINUTES = 65
+const INACTIVITY_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000
+const INACTIVITY_RESPONSE_WINDOW_MS = 5 * 60 * 1000
+const INACTIVITY_REMINDER_DELAY_MS = 10 * 60 * 1000
+const NON_MANUAL_STOP_REASON_CODES = new Set(['ARRET_AUTO', 'INACTIVITE'])
+type StopReasonCode = 'ARRET_MANUEL' | 'INACTIVITE' | 'ARRET_AUTO'
 
 type WorkSessionEntry = {
   sessionId: number
@@ -21,6 +26,8 @@ type WorkSessionEntry = {
   endIso: string
   durationMs: number
   comment: string | null
+  stopReasonCode: StopReasonCode | null
+  stopReasonLabel: string | null
 }
 
 type WorkEntry = {
@@ -37,6 +44,8 @@ type PauseSegmentEntry = {
   endIso: string
   durationMs: number
   comment: string | null
+  stopReasonCode: StopReasonCode | null
+  stopReasonLabel: string | null
 }
 
 type PauseEntry = {
@@ -236,6 +245,47 @@ function getLatestWorkComment(entry: WorkEntry) {
   return latestSession?.comment ?? ''
 }
 
+function getLatestWorkStopReason(entry: WorkEntry) {
+  const latestSession = entry.sessions.at(-1)
+  return {
+    code: latestSession?.stopReasonCode ?? null,
+    label: latestSession?.stopReasonLabel ?? null,
+  }
+}
+
+function getNonManualStopReasonLabel(
+  code: StopReasonCode | null | undefined,
+  label: string | null | undefined
+) {
+  if (!code || !NON_MANUAL_STOP_REASON_CODES.has(code) || !label) {
+    return null
+  }
+  return label.toUpperCase()
+}
+
+function buildCommentDisplayParts(
+  comment: string | null | undefined,
+  stopReasonCode: StopReasonCode | null | undefined,
+  stopReasonLabel: string | null | undefined
+) {
+  const trimmedComment = comment?.trim() ?? ''
+  const alertLabel = getNonManualStopReasonLabel(stopReasonCode, stopReasonLabel)
+
+  if (trimmedComment && alertLabel) {
+    return { text: trimmedComment, alertLabel, hasContent: true }
+  }
+
+  if (trimmedComment) {
+    return { text: trimmedComment, alertLabel: null, hasContent: true }
+  }
+
+  if (alertLabel) {
+    return { text: '', alertLabel, hasContent: true }
+  }
+
+  return { text: '-', alertLabel: null, hasContent: false }
+}
+
 function summarizeWorkEntries(entries: WorkEntry[]) {
   const summariesByTaskId = new Map<string, DayTaskSummary>()
 
@@ -290,6 +340,21 @@ function splitCommentLines(comment: string) {
     .split(/\s-\s/g)
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
+}
+
+function isSystemAutoStopComment(comment: string) {
+  const normalizedComment = comment.trim().toLowerCase()
+  return (
+    normalizedComment.startsWith('session arrêtée automatiquement après') ||
+    normalizedComment.startsWith('session arretee automatiquement apres') ||
+    normalizedComment.startsWith('pause arrêtée automatiquement après') ||
+    normalizedComment.startsWith('pause arretee automatiquement apres')
+  )
+}
+
+function sanitizeUserComment(comment: string | null | undefined) {
+  if (!comment) return null
+  return isSystemAutoStopComment(comment) ? null : comment
 }
 
 function capitalizeFirstLetter(value: string) {
@@ -431,9 +496,11 @@ export default function AccueilPage() {
     null
   )
   const [pointageDayView, setPointageDayView] = useState<'today' | 'yesterday'>('today')
+  const [isYesterdayAutoValidated, setIsYesterdayAutoValidated] = useState(false)
   const [yesterdayPointageSnapshot, setYesterdayPointageSnapshot] =
     useState<PointageDaySnapshot | null>(null)
   const [connectedUserId, setConnectedUserId] = useState<number | null>(null)
+  const [connectedUserRole, setConnectedUserRole] = useState<'ADMIN' | 'EMPLOYE'>('EMPLOYE')
   const [expectedDailyDurationMs, setExpectedDailyDurationMs] = useState<number | null>(null)
   const [currentPointageId, setCurrentPointageId] = useState<number | null>(null)
   const [currentSessionPointageId, setCurrentSessionPointageId] = useState<number | null>(null)
@@ -448,10 +515,16 @@ export default function AccueilPage() {
   const [agendaDaySummaries, setAgendaDaySummaries] = useState<Record<string, DaySummary>>({})
   const [pointageMutationPending, setPointageMutationPending] = useState(false)
   const [pointageRefreshKey, setPointageRefreshKey] = useState(0)
+  const [showInactivityPrompt, setShowInactivityPrompt] = useState(false)
   const stopErrorTimeoutRef = useRef<number | null>(null)
   const midnightTransitionPendingRef = useRef(false)
   const serverClockAnchorRef = useRef<{ serverMs: number; perfMs: number } | null>(null)
   const statusIdCacheRef = useRef<Record<string, number | undefined>>({})
+  const inactivityPromptShownAtRef = useRef<number | null>(null)
+  const inactivityStopInProgressRef = useRef(false)
+  const inactivityLastCheckResponseAtRef = useRef<number | null>(null)
+  const inactivityReminderSentRef = useRef(false)
+  const inactivityNotificationRef = useRef<Notification | null>(null)
   const pointageCommentRef = useRef(pointageComment)
   const pauseCommentRef = useRef(pauseComment)
   const pointageModeRef = useRef(pointageMode)
@@ -484,6 +557,7 @@ export default function AccueilPage() {
         const sessionPayload = (await response.json()) as {
           userId?: number
           username?: string
+          role?: string
         }
 
         if (cancelled) {
@@ -493,6 +567,7 @@ export default function AccueilPage() {
         if (typeof sessionPayload.userId === 'number') {
           setConnectedUserId(sessionPayload.userId)
         }
+        setConnectedUserRole(sessionPayload.role === 'ADMIN' ? 'ADMIN' : 'EMPLOYE')
 
         if (typeof window !== 'undefined' && typeof sessionPayload.username === 'string') {
           if (window.localStorage.getItem(CONNECTED_USERNAME_STORAGE_KEY) !== sessionPayload.username) {
@@ -565,7 +640,7 @@ export default function AccueilPage() {
           body: JSON.stringify(body ?? {}),
         })
 
-        const payload = (await response.json().catch(() => null)) as
+        const payload = (await response.clone().json().catch(() => null)) as
           | { error?: string }
           | T
           | null
@@ -589,7 +664,7 @@ export default function AccueilPage() {
             error:
               payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string'
                 ? payload.error
-                : 'Une erreur est survenue.',
+                : `Erreur HTTP ${response.status}: ${(await response.text().catch(() => '')).trim() || 'réponse vide'}`,
           }
         }
 
@@ -597,10 +672,11 @@ export default function AccueilPage() {
           ok: true,
           data: payload as T,
         }
-      } catch {
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue.'
         return {
           ok: false,
-          error: 'Une erreur est survenue.',
+          error: errorMessage || 'Une erreur est survenue.',
         }
       }
     },
@@ -647,6 +723,82 @@ export default function AccueilPage() {
     } catch {
       // Keep existing anchor if sync fails.
       return false
+    }
+  }, [])
+
+  const playInactivityTone = useCallback(() => {
+    try {
+      const AudioContextClass =
+        typeof window !== 'undefined'
+          ? (window.AudioContext ||
+              (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)
+          : null
+
+      if (!AudioContextClass) {
+        return
+      }
+
+      const audioContext = new AudioContextClass()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      oscillator.type = 'sine'
+      oscillator.frequency.value = 880
+      gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.02)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.22)
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      oscillator.start()
+      oscillator.stop(audioContext.currentTime + 0.24)
+      window.setTimeout(() => {
+        void audioContext.close()
+      }, 320)
+    } catch {
+      // Ignore sound errors silently.
+    }
+  }, [])
+
+  const closeInactivityNotification = useCallback(() => {
+    if (inactivityNotificationRef.current) {
+      inactivityNotificationRef.current.close()
+      inactivityNotificationRef.current = null
+    }
+  }, [])
+
+  const notifyInactivity = useCallback(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return
+    }
+
+    if (Notification.permission !== 'granted') {
+      return
+    }
+
+    closeInactivityNotification()
+    const notification = new Notification('Jarvis Time', {
+      body: `Toujours en activité${connectedUsername ? ` ${connectedUsername}` : ''} ? Le pointage va s'arrêter automatiquement.`,
+      tag: 'pointage-inactivite',
+      renotify: true,
+      requireInteraction: true,
+    })
+    notification.onclick = () => {
+      window.focus()
+      notification.close()
+    }
+    inactivityNotificationRef.current = notification
+  }, [closeInactivityNotification, connectedUsername])
+
+  const ensureNotificationPermission = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      return
+    }
+
+    if (Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission()
+      } catch {
+        // Ignore notification permission errors.
+      }
     }
   }, [])
 
@@ -924,6 +1076,14 @@ export default function AccueilPage() {
     if (options?.configurationTab !== undefined) {
       setActiveConfigurationTab(options.configurationTab)
     }
+    if (menu === 'gestion_taches') {
+      router.push('/gestion-des-activites')
+      return
+    }
+    if (menu === 'taches') {
+      router.push('/taches')
+      return
+    }
     router.push('/accueil')
   }
 
@@ -986,9 +1146,9 @@ export default function AccueilPage() {
 
       const { data: userData, error: userError } = await supabase
         .from('utilisateur')
-        .select('id_utilisateur')
+        .select('id_utilisateur, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('username_utilisateur', connectedUsername)
-        .eq('actif', true)
+        .eq('id_statut_utilisateur.code_statut_utilisateur', 'ACTIVE')
         .single()
 
       if (userError || !userData) {
@@ -1098,9 +1258,9 @@ export default function AccueilPage() {
       const yesterdayDateStamp = getLocalDateStamp(yesterdayRef)
       const { data: userData, error: userError } = await supabase
         .from('utilisateur')
-        .select('id_utilisateur')
+        .select('id_utilisateur, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('username_utilisateur', connectedUsername)
-        .eq('actif', true)
+        .eq('id_statut_utilisateur.code_statut_utilisateur', 'ACTIVE')
         .single()
 
       if (cancelled || userError || !userData) {
@@ -1150,7 +1310,7 @@ export default function AccueilPage() {
             supabase
               .from('session_pointage')
               .select(
-                'id_session_pointage, id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage'
+                'id_session_pointage, id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage, motif_arret_session:motif_arret_session!fk_session_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
               )
               .in('id_pointage', dayPointageIds)
               .order('debut_session_pointage', { ascending: true }),
@@ -1217,7 +1377,9 @@ export default function AccueilPage() {
             startIso: session.debut_session_pointage,
             endIso: session.fin_session_pointage,
             durationMs,
-            comment: session.commentaire_session_pointage,
+            comment: sanitizeUserComment(session.commentaire_session_pointage),
+            stopReasonCode: session.motif_arret_session?.code_motif_arret_session ?? null,
+            stopReasonLabel: session.motif_arret_session?.libelle_motif_arret_session ?? null,
           })
           entry.totalDurationMs += durationMs
         }
@@ -1232,7 +1394,7 @@ export default function AccueilPage() {
             ? await supabase
                 .from('pause_pointage')
                 .select(
-                  'id_pause_pointage, id_session_pointage, debut_pause_pointage, fin_pause_pointage, commentaire_pause_pointage'
+                  'id_pause_pointage, id_session_pointage, debut_pause_pointage, fin_pause_pointage, commentaire_pause_pointage, motif_arret_session:motif_arret_session!fk_pause_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
                 )
                 .in('id_session_pointage', daySessionIds)
                 .order('debut_pause_pointage', { ascending: true })
@@ -1274,7 +1436,9 @@ export default function AccueilPage() {
             startIso: pause.debut_pause_pointage,
             endIso: pause.fin_pause_pointage,
             durationMs,
-            comment: pause.commentaire_pause_pointage,
+            comment: sanitizeUserComment(pause.commentaire_pause_pointage),
+            stopReasonCode: pause.motif_arret_session?.code_motif_arret_session ?? null,
+            stopReasonLabel: pause.motif_arret_session?.libelle_motif_arret_session ?? null,
           })
           entry.totalDurationMs += durationMs
         }
@@ -1307,6 +1471,7 @@ export default function AccueilPage() {
         : await buildDaySnapshot(yesterdayDateStamp, yesterdayRef)
       if (!cancelled) {
         setYesterdayPointageSnapshot(restoredYesterdaySnapshot)
+        setIsYesterdayAutoValidated(false)
       }
 
       if (cancelled || pointageError || !pointageRows || pointageRows.length === 0) {
@@ -1316,6 +1481,7 @@ export default function AccueilPage() {
           setPointageDayView('today')
           if (!restoredYesterdaySnapshot) {
             setYesterdayPointageSnapshot(null)
+            setIsYesterdayAutoValidated(false)
           }
           setPointageMode('idle')
           setWorkElapsedMs(0)
@@ -1333,7 +1499,7 @@ export default function AccueilPage() {
         supabase
           .from('session_pointage')
           .select(
-            'id_session_pointage, id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage'
+            'id_session_pointage, id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage, motif_arret_session:motif_arret_session!fk_session_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
           )
           .in('id_pointage', pointageIds)
           .order('debut_session_pointage', { ascending: true }),
@@ -1378,6 +1544,10 @@ export default function AccueilPage() {
             debut_session_pointage: string
             fin_session_pointage: string | null
             commentaire_session_pointage: string | null
+            motif_arret_session: {
+              code_motif_arret_session: StopReasonCode
+              libelle_motif_arret_session: string
+            } | null
           }
         | null = null
 
@@ -1412,7 +1582,9 @@ export default function AccueilPage() {
             startIso: session.debut_session_pointage,
             endIso: session.fin_session_pointage,
             durationMs,
-            comment: session.commentaire_session_pointage,
+            comment: sanitizeUserComment(session.commentaire_session_pointage),
+            stopReasonCode: session.motif_arret_session?.code_motif_arret_session ?? null,
+            stopReasonLabel: session.motif_arret_session?.libelle_motif_arret_session ?? null,
           })
           entry.totalDurationMs += durationMs
         } else {
@@ -1430,7 +1602,7 @@ export default function AccueilPage() {
           ? await supabase
               .from('pause_pointage')
               .select(
-                'id_pause_pointage, id_session_pointage, debut_pause_pointage, fin_pause_pointage, commentaire_pause_pointage'
+                'id_pause_pointage, id_session_pointage, debut_pause_pointage, fin_pause_pointage, commentaire_pause_pointage, motif_arret_session:motif_arret_session!fk_pause_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
               )
               .in('id_session_pointage', sessionIds)
               .order('debut_pause_pointage', { ascending: true })
@@ -1447,6 +1619,10 @@ export default function AccueilPage() {
             debut_pause_pointage: string
             fin_pause_pointage: string | null
             commentaire_pause_pointage: string | null
+            motif_arret_session: {
+              code_motif_arret_session: StopReasonCode
+              libelle_motif_arret_session: string
+            } | null
           }
         | null = null
 
@@ -1480,7 +1656,9 @@ export default function AccueilPage() {
             startIso: pause.debut_pause_pointage,
             endIso: pause.fin_pause_pointage,
             durationMs,
-            comment: pause.commentaire_pause_pointage,
+            comment: sanitizeUserComment(pause.commentaire_pause_pointage),
+            stopReasonCode: pause.motif_arret_session?.code_motif_arret_session ?? null,
+            stopReasonLabel: pause.motif_arret_session?.libelle_motif_arret_session ?? null,
           })
           entry.totalDurationMs += durationMs
         } else {
@@ -1584,7 +1762,7 @@ export default function AccueilPage() {
       setPointageComment(
         isSameActiveSession
           ? pointageCommentRef.current
-          : activeSession.commentaire_session_pointage ??
+          : sanitizeUserComment(activeSession.commentaire_session_pointage) ??
               (activeWorkEntry ? getLatestWorkComment(activeWorkEntry) : '')
       )
 
@@ -1592,7 +1770,7 @@ export default function AccueilPage() {
         setCurrentPausePointageId(activePause.id_pause_pointage)
         setCurrentPauseStartedAtIso(activePause.debut_pause_pointage)
         setPauseElapsedMs(activePauseElapsedMs)
-        setPauseComment(activePause.commentaire_pause_pointage ?? '')
+        setPauseComment(sanitizeUserComment(activePause.commentaire_pause_pointage) ?? '')
         setPointageMode('paused')
       } else {
         setCurrentPausePointageId(null)
@@ -1680,9 +1858,9 @@ export default function AccueilPage() {
 
       const { data: userData, error: userError } = await supabase
         .from('utilisateur')
-        .select('id_utilisateur')
+        .select('id_utilisateur, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('username_utilisateur', connectedUsername)
-        .eq('actif', true)
+        .eq('id_statut_utilisateur.code_statut_utilisateur', 'ACTIVE')
         .single()
 
       if (cancelled || userError || !userData) {
@@ -1718,7 +1896,7 @@ export default function AccueilPage() {
         supabase
           .from('session_pointage')
           .select(
-            'id_session_pointage, id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage'
+            'id_session_pointage, id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage, motif_arret_session:motif_arret_session!fk_session_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
           )
           .in('id_pointage', pointageIds)
           .order('debut_session_pointage', { ascending: true }),
@@ -1771,7 +1949,7 @@ export default function AccueilPage() {
           session.debut_session_pointage,
           session.fin_session_pointage
         )
-        const latestComment = session.commentaire_session_pointage || '-'
+        const latestComment = sanitizeUserComment(session.commentaire_session_pointage) || '-'
         const existingSummary = taskMap.get(taskKey)
 
         const existingComment = existingSummary?.comment ?? '-'
@@ -2047,6 +2225,10 @@ export default function AccueilPage() {
       debut_session_pointage: string
       fin_session_pointage: string | null
       commentaire_session_pointage: string | null
+      motif_arret_session: {
+        code_motif_arret_session: StopReasonCode
+        libelle_motif_arret_session: string
+      } | null
     }>
   ): WorkEntry => {
     const normalizedSessions = sessions
@@ -2060,7 +2242,9 @@ export default function AccueilPage() {
             session.debut_session_pointage,
             session.fin_session_pointage as string
           ),
-          comment: session.commentaire_session_pointage,
+          comment: sanitizeUserComment(session.commentaire_session_pointage),
+          stopReasonCode: session.motif_arret_session?.code_motif_arret_session ?? null,
+          stopReasonLabel: session.motif_arret_session?.libelle_motif_arret_session ?? null,
         }
       })
 
@@ -2160,7 +2344,7 @@ export default function AccueilPage() {
     const { data: sessionRows, error: sessionLookupError } = await supabase
       .from('session_pointage')
       .select(
-        'id_session_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage'
+        'id_session_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage, motif_arret_session:motif_arret_session!fk_session_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
       )
       .in('id_pointage', pointageIds)
       .order('debut_session_pointage', { ascending: true })
@@ -2193,7 +2377,14 @@ export default function AccueilPage() {
   }
 
   const registerCompletedPause = useCallback(
-    (pauseId: number, startIso: string, endIso: string, comment: string | null) => {
+    (
+      pauseId: number,
+      startIso: string,
+      endIso: string,
+      comment: string | null,
+      stopReasonCode: StopReasonCode | null,
+      stopReasonLabel: string | null
+    ) => {
       const durationMs = getDurationMsBetween(startIso, endIso)
       const taskId = currentWorkEntry?.taskId ?? taskChoice
       const taskTitle = currentTaskTitle
@@ -2209,6 +2400,8 @@ export default function AccueilPage() {
           endIso,
           durationMs,
           comment,
+          stopReasonCode,
+          stopReasonLabel,
         }
 
         const existingEntry = previousEntries.find((entry) => entry.taskId === taskId)
@@ -2241,6 +2434,7 @@ export default function AccueilPage() {
 
   const closeCurrentSession = async (
     sessionComment: string | null,
+    stopReasonCode: StopReasonCode = 'ARRET_MANUEL',
     forcedSessionEndIso?: string
   ) => {
     if (!currentSessionPointageId) {
@@ -2260,9 +2454,11 @@ export default function AccueilPage() {
         sessionComment,
         pauseId: pointageMode === 'paused' ? currentPausePointageId : null,
         pauseComment: pauseFinalComment,
+        stopReasonCode,
       })
 
       if (!stopResult.ok) {
+        setPointageStopError(stopResult.error || "Impossible d'arrêter le pointage.")
         return false
       }
 
@@ -2274,7 +2470,9 @@ export default function AccueilPage() {
           currentPausePointageId,
           currentPauseStartedAtIso,
           rpcPauseEndIso ?? resolvedSessionEndIso ?? currentPauseStartedAtIso,
-          pauseFinalComment
+          pauseFinalComment,
+          stopReasonCode,
+          stopReasonCode === 'INACTIVITE' ? "Session arrêtée pour inactivité" : null
         )
       }
     }
@@ -2304,6 +2502,9 @@ export default function AccueilPage() {
           endIso: resolvedSessionEndIso,
           durationMs: sessionDurationMs,
           comment: sessionComment,
+          stopReasonCode,
+          stopReasonLabel:
+            stopReasonCode === 'INACTIVITE' ? "Session arrêtée pour inactivité" : null,
         }
 
         const existingEntry = previousEntries.find(
@@ -2457,6 +2658,9 @@ export default function AccueilPage() {
       const yesterdayDateStamp = getLocalDateStamp(yesterdayDate)
 
       await autoValidatePendingDaysBefore(connectedUserId, yesterdayDateStamp)
+      await postPointageApi<{ validatedCount: number }>('/api/pointage/validate', {
+        pointageDate: yesterdayDateStamp,
+      })
 
       let yesterdayWorkEntries = workEntries
       if (finishedEntryId !== null) {
@@ -2466,6 +2670,8 @@ export default function AccueilPage() {
           endIso: sessionEndIso,
           durationMs: closedSessionDurationMs,
           comment: sessionComment,
+          stopReasonCode: 'ARRET_AUTO',
+          stopReasonLabel: 'Arrêt automatique de la session',
         }
         const existingEntry = yesterdayWorkEntries.find(
           (entry) => entry.pointageId === finishedEntryId
@@ -2505,6 +2711,8 @@ export default function AccueilPage() {
           endIso: sessionEndIso,
           durationMs: pauseDurationMs,
           comment: pauseFinalComment,
+          stopReasonCode: 'ARRET_AUTO',
+          stopReasonLabel: 'Arrêt automatique de la session',
         }
         const existingPauseEntry = yesterdayPauseEntries.find((entry) => entry.taskId === taskIdForPause)
         if (!existingPauseEntry) {
@@ -2536,6 +2744,7 @@ export default function AccueilPage() {
         workEntries: yesterdayWorkEntries,
         pauseEntries: yesterdayPauseEntries,
       })
+      setIsYesterdayAutoValidated(true)
       setPointageDayView('today')
 
       if (finishedEntryId !== null) {
@@ -2546,6 +2755,8 @@ export default function AccueilPage() {
             endIso: sessionEndIso,
             durationMs: closedSessionDurationMs,
             comment: sessionComment,
+            stopReasonCode: 'ARRET_AUTO',
+            stopReasonLabel: 'Arrêt automatique de la session',
           }
 
           const existingEntry = previousEntries.find((entry) => entry.pointageId === finishedEntryId)
@@ -2749,6 +2960,7 @@ export default function AccueilPage() {
 
         if (didAutoValidateYesterday) {
           setYesterdayPointageSnapshot(null)
+          setIsYesterdayAutoValidated(false)
           setPointageDayView('today')
           setPointageRefreshKey((previousKey) => previousKey + 1)
         }
@@ -2967,7 +3179,9 @@ export default function AccueilPage() {
         currentPausePointageId,
         currentPauseStartedAtIso,
         pauseEndIso,
-        pauseFinalComment
+        pauseFinalComment,
+        'ARRET_MANUEL',
+        null
       )
       setCurrentSessionPauseTotalMs((previous) => previous + completedPauseDurationMs)
     }
@@ -2986,14 +3200,127 @@ export default function AccueilPage() {
 
     setPointageMutationPending(true)
     setPointageStopError('')
-    const didClose = await closeCurrentSession(pointageComment.trim() || null)
+    const didClose = await closeCurrentSession(pointageComment.trim() || null, 'ARRET_MANUEL')
     if (!didClose) {
-      setPointageStopError("Impossible d'arrÃªter le pointage.")
+      setPointageStopError((previous) => previous || "Impossible d'arrêter le pointage.")
       setPointageMutationPending(false)
       return
     }
     setPointageMutationPending(false)
   }
+
+  const acknowledgeInactivityAndContinue = () => {
+    inactivityLastCheckResponseAtRef.current = Date.now()
+    inactivityPromptShownAtRef.current = null
+    inactivityReminderSentRef.current = false
+    inactivityStopInProgressRef.current = false
+    setShowInactivityPrompt(false)
+    closeInactivityNotification()
+  }
+
+  const stopPointageFromInactivityPrompt = async () => {
+    inactivityStopInProgressRef.current = true
+    inactivityPromptShownAtRef.current = null
+    setShowInactivityPrompt(false)
+    closeInactivityNotification()
+    if (pointageMutationPending || !currentSessionPointageId) {
+      inactivityStopInProgressRef.current = false
+      return
+    }
+
+    setPointageMutationPending(true)
+    setPointageStopError('')
+    const didClose = await closeCurrentSession(pointageComment.trim() || null, 'INACTIVITE')
+    if (!didClose) {
+      setPointageStopError((previous) => previous || "Impossible d'arrêter le pointage.")
+      setPointageMutationPending(false)
+      inactivityStopInProgressRef.current = false
+      return
+    }
+    setPointageMutationPending(false)
+    inactivityStopInProgressRef.current = false
+  }
+
+  useEffect(() => {
+    if (pointageMode !== 'running') {
+      setShowInactivityPrompt(false)
+      inactivityLastCheckResponseAtRef.current = null
+      inactivityPromptShownAtRef.current = null
+      inactivityReminderSentRef.current = false
+      inactivityStopInProgressRef.current = false
+      closeInactivityNotification()
+      return
+    }
+
+    if (inactivityLastCheckResponseAtRef.current === null) {
+      inactivityLastCheckResponseAtRef.current = Date.now()
+    }
+    inactivityStopInProgressRef.current = false
+
+    const checkInactivity = window.setInterval(() => {
+      if (pointageMutationPending || inactivityStopInProgressRef.current || pointageMode !== 'running') {
+        return
+      }
+
+      const lastResponseAt = inactivityLastCheckResponseAtRef.current
+      if (lastResponseAt === null) {
+        return
+      }
+
+      const now = Date.now()
+      if (!showInactivityPrompt) {
+        if (now - lastResponseAt >= INACTIVITY_CHECK_INTERVAL_MS) {
+          inactivityPromptShownAtRef.current = now
+          inactivityReminderSentRef.current = false
+          setShowInactivityPrompt(true)
+          playInactivityTone()
+          notifyInactivity()
+        }
+        return
+      }
+
+      const promptShownAt = inactivityPromptShownAtRef.current
+      if (promptShownAt === null) {
+        return
+      }
+
+      const elapsedSincePromptMs = now - promptShownAt
+      if (
+        !inactivityReminderSentRef.current &&
+        elapsedSincePromptMs >= INACTIVITY_REMINDER_DELAY_MS
+      ) {
+        inactivityReminderSentRef.current = true
+        playInactivityTone()
+        notifyInactivity()
+      }
+
+      if (elapsedSincePromptMs >= INACTIVITY_REMINDER_DELAY_MS + INACTIVITY_RESPONSE_WINDOW_MS) {
+        void stopPointageFromInactivityPrompt()
+      }
+    }, 1000)
+
+    return () => {
+      window.clearInterval(checkInactivity)
+    }
+  }, [
+    closeInactivityNotification,
+    notifyInactivity,
+    playInactivityTone,
+    pointageMode,
+    pointageMutationPending,
+    showInactivityPrompt,
+  ])
+
+  useEffect(() => {
+    if (
+      pointageMode !== 'idle' &&
+      currentSessionPointageId &&
+      typeof window !== 'undefined' &&
+      document.visibilityState === 'visible'
+    ) {
+      void ensureNotificationPermission()
+    }
+  }, [currentSessionPointageId, ensureNotificationPermission, pointageMode])
 
   const validatePointage = () => {
     setPointageValidationPreviewDate(
@@ -3067,6 +3394,7 @@ export default function AccueilPage() {
 
     if (isYesterdayView) {
       setYesterdayPointageSnapshot(null)
+      setIsYesterdayAutoValidated(false)
       setPointageDayView('today')
     } else {
       setWorkEntries([])
@@ -3100,6 +3428,7 @@ export default function AccueilPage() {
   const canValidatePointage =
     (isYesterdayView || pointageMode === 'idle') &&
     viewedWorkEntries.length > 0 &&
+    !(isYesterdayView && isYesterdayAutoValidated) &&
     !pointageMutationPending
   const pointageReviewEntries = useMemo(
     () =>
@@ -3157,7 +3486,7 @@ export default function AccueilPage() {
   const handleLogout = async () => {
     if (pointageMode !== 'idle' && currentSessionPointageId && !pointageMutationPending) {
       setPointageMutationPending(true)
-      const didClose = await closeCurrentSession(pointageComment.trim() || null)
+      const didClose = await closeCurrentSession(pointageComment.trim() || null, 'ARRET_AUTO')
       setPointageMutationPending(false)
       if (!didClose) {
         setPointageStopError("Impossible d'arrÃªter automatiquement le pointage.")
@@ -3185,6 +3514,7 @@ export default function AccueilPage() {
     <>
       <AppShell
         connectedUsername={connectedUsername}
+        userRole={connectedUserRole}
         activeTab={activeTab}
         activeMenu={activeMenu}
         activeDemandesSubMenu={activeDemandesSubMenu}
@@ -3472,6 +3802,11 @@ export default function AccueilPage() {
                     ) : null}
                     </div>
                   ) : null}
+                  {isYesterdayView && isYesterdayAutoValidated ? (
+                    <div className={styles.pointageAutoValidatedNotice}>
+                      Pointage validé automatiquement au passage de minuit
+                    </div>
+                  ) : null}
                   {viewedWorkEntries.length > 0 ? (
                     <div className={styles.workHistoryOuter}>
                       <section className={styles.workHistoryBlock} aria-label="Mes travaux">
@@ -3484,6 +3819,12 @@ export default function AccueilPage() {
                         <div className={styles.workHistoryBody}>
                           {viewedWorkEntries.map((entry) => {
                             const latestComment = getLatestWorkComment(entry)
+                            const latestStopReason = getLatestWorkStopReason(entry)
+                            const latestCommentDisplay = buildCommentDisplayParts(
+                              latestComment,
+                              latestStopReason.code,
+                              latestStopReason.label
+                            )
                             const isEntryLocked =
                               currentWorkEntryId === entry.pointageId
 
@@ -3510,7 +3851,15 @@ export default function AccueilPage() {
                                   {formatDuration(entry.totalDurationMs)}
                                 </div>
                                 <div className={styles.workHistoryComment}>
-                                  {latestComment || '-'}
+                                  {latestCommentDisplay.text || null}
+                                  {latestCommentDisplay.alertLabel ? (
+                                    <>
+                                      <br />
+                                      <span className={styles.stopReasonAlert}>
+                                        {`(${latestCommentDisplay.alertLabel})`}
+                                      </span>
+                                    </>
+                                  ) : null}
                                 </div>
                                 <div className={styles.workHistoryActions}>
                                   <button
@@ -3565,8 +3914,28 @@ export default function AccueilPage() {
                                 <div className={styles.pauseHistoryTimes}>
                                   {entry.pauses.map((pause) => (
                                     <div key={pause.pauseId} className={styles.pauseHistoryTimeRange}>
-                                      {formatTimeLabel(pause.startIso)} - {formatTimeLabel(pause.endIso)}
-                                      {pause.comment ? ` (${pause.comment})` : ''}
+                                      {(() => {
+                                        const pauseComment = pause.comment?.trim() ?? ''
+                                        const pauseStopReasonLabel = getNonManualStopReasonLabel(
+                                          pause.stopReasonCode,
+                                          pause.stopReasonLabel
+                                        )
+
+                                        return (
+                                          <>
+                                            {formatTimeLabel(pause.startIso)} - {formatTimeLabel(pause.endIso)}
+                                            {pauseComment ? ` (${pauseComment})` : ''}
+                                            {pauseStopReasonLabel ? (
+                                              <>
+                                                <br />
+                                                <span className={styles.stopReasonAlert}>
+                                                  {`(${pauseStopReasonLabel})`}
+                                                </span>
+                                              </>
+                                            ) : null}
+                                          </>
+                                        )
+                                      })()}
                                     </div>
                                   ))}
                                 </div>
@@ -3642,7 +4011,7 @@ export default function AccueilPage() {
                           <div className={styles.pointageReviewTaskComment}>
                             {splitCommentLines(task.comment).map((line, index) => (
                               <div key={`${task.taskKey}-review-comment-${index}`} className={styles.commentLine}>
-                                <span className={styles.commentMarker}>â–¸</span> {line}
+                                <span className={styles.commentMarker}>&gt;</span> {line}
                               </div>
                             ))}
                           </div>
@@ -3716,7 +4085,7 @@ export default function AccueilPage() {
                         <div className={styles.pointageReviewTaskComment}>
                           {splitCommentLines(entry.comment).map((line, index) => (
                             <div key={`${entry.pointageId}-comment-${index}`} className={styles.commentLine}>
-                              <span className={styles.commentMarker}>â–¸</span> {line}
+                              <span className={styles.commentMarker}>&gt;</span> {line}
                             </div>
                           ))}
                         </div>
@@ -3738,8 +4107,35 @@ export default function AccueilPage() {
           </div>
         </div>
       ) : null}
+      {showInactivityPrompt && pointageMode === 'running' ? (
+        <div className={styles.inactivityToast} role="dialog" aria-live="assertive" aria-label="Alerte d'inactivité">
+          <div className={styles.inactivityToastHeader}>Jarvis Time</div>
+          <div className={styles.inactivityToastBody}>
+            <p className={styles.inactivityToastMessage}>
+              {`Toujours en activité${connectedUsername ? ` ${connectedUsername}` : ''} ? Répondez sous 5 minutes.`}
+            </p>
+            <button
+              type="button"
+              className={`${styles.inactivityActionBtn} ${styles.inactivityContinueBtn}`}
+              onClick={acknowledgeInactivityAndContinue}
+            >
+              CONTINUER LE POINTAGE
+            </button>
+            <button
+              type="button"
+              className={`${styles.inactivityActionBtn} ${styles.inactivityStopBtn}`}
+              onClick={() => {
+                void stopPointageFromInactivityPrompt()
+              }}
+            >
+              ARRÊTER LE POINTAGE
+            </button>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
+
 
 

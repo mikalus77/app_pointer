@@ -73,6 +73,17 @@ export async function POST(request: Request) {
       return buildPointageErrorResponse(POINTAGE_ERRORS.rolloverCurrentPointageMissing, 404)
     }
 
+    const { data: autoStopReasonRow, error: autoStopReasonError } = await supabase
+      .from('motif_arret_session')
+      .select('id_motif_arret_session')
+      .eq('code_motif_arret_session', 'ARRET_AUTO')
+      .eq('actif', true)
+      .single()
+
+    if (autoStopReasonError || !autoStopReasonRow) {
+      return buildPointageErrorResponse(POINTAGE_ERRORS.rolloverFailed, 500)
+    }
+
     if (mode === 'paused' && pauseId !== null) {
       const { error: pauseUpdateError } = await supabase
         .from('pause_pointage')
@@ -80,6 +91,7 @@ export async function POST(request: Request) {
           fin_pause_pointage: sessionEndIso,
           commentaire_pause_pointage: pauseComment,
           last_seen_pause_pointage: sessionEndIso,
+          id_motif_arret_session: autoStopReasonRow.id_motif_arret_session,
         })
         .eq('id_pause_pointage', pauseId)
         .is('fin_pause_pointage', null)
@@ -95,6 +107,7 @@ export async function POST(request: Request) {
         fin_session_pointage: sessionEndIso,
         commentaire_session_pointage: sessionComment,
         last_seen_session_pointage: sessionEndIso,
+        id_motif_arret_session: autoStopReasonRow.id_motif_arret_session,
       })
       .eq('id_session_pointage', sessionId)
       .is('fin_session_pointage', null)
@@ -107,7 +120,6 @@ export async function POST(request: Request) {
       .from('statut_pointage')
       .select('id_statut_pointage')
       .eq('code_statut_pointage', 'EN_COURS')
-      .eq('actif', true)
       .single()
 
     if (statusError || !statusRow) {

@@ -20,6 +20,7 @@ export async function POST(request: Request) {
       sessionComment?: string | null
       pauseId?: number | null
       pauseComment?: string | null
+      stopReasonCode?: 'ARRET_MANUEL' | 'INACTIVITE' | 'ARRET_AUTO'
     }
 
     const sessionId = Number(body.sessionId)
@@ -27,6 +28,11 @@ export async function POST(request: Request) {
       typeof body.pauseId === 'number' && Number.isInteger(body.pauseId) ? body.pauseId : null
     const sessionComment = body.sessionComment?.trim() || null
     const pauseComment = body.pauseComment?.trim() || null
+    const stopReasonCode = body.stopReasonCode ?? 'ARRET_MANUEL'
+
+    if (!['ARRET_MANUEL', 'INACTIVITE', 'ARRET_AUTO'].includes(stopReasonCode)) {
+      return buildPointageErrorResponse(POINTAGE_ERRORS.stopFailed, 400)
+    }
 
     if (!Number.isInteger(sessionId) || sessionId <= 0) {
       return buildPointageErrorResponse(POINTAGE_ERRORS.invalidSession)
@@ -50,10 +56,11 @@ export async function POST(request: Request) {
       p_session_comment: sessionComment,
       p_pause_id: pauseId,
       p_pause_comment: pauseComment,
+      p_stop_reason_code: stopReasonCode,
     })
 
     if (error || !data) {
-      return buildPointageErrorResponse(POINTAGE_ERRORS.stopFailed, 500)
+      return buildPointageErrorResponse(error?.message ?? POINTAGE_ERRORS.stopFailed, 500)
     }
 
     const row = Array.isArray(data) ? data[0] : data

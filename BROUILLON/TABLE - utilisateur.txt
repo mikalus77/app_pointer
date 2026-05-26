@@ -10,8 +10,8 @@ UTILISATEUR(
   heure_min_pointage,
   heure_max_pointage,
   date_creation_utilisateur,
-  actif,
-  duree_journaliere_attendue_utilisateur
+  duree_journaliere_attendue_utilisateur,
+  id_statut_utilisateur
 )
 
 ---------------------------------------------------------------------------------------------------------------
@@ -28,8 +28,8 @@ create table utilisateur (
   heure_min_pointage time not null default '06:00:00',
   heure_max_pointage time not null default '22:00:00',
   date_creation_utilisateur timestamp not null default now(),
-  actif boolean not null default true,
-  duree_journaliere_attendue_utilisateur integer not null default 420
+  duree_journaliere_attendue_utilisateur integer not null default 420,
+  id_statut_utilisateur bigint not null
 );
 
 ---------------------------------------------------------------------------------------------------------------
@@ -38,4 +38,10 @@ alter table utilisateur
 add constraint heure_pointage_utilisateur_check
 check (heure_min_pointage < heure_max_pointage);
 
+alter table utilisateur
+add constraint fk_utilisateur_statut_utilisateur
+foreign key (id_statut_utilisateur)
+references statut_utilisateur(id_statut_utilisateur);
+
 ---------------------------------------------------------------------------------------------------------------
+

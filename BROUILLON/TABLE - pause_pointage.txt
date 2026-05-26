@@ -3,7 +3,8 @@ PAUSE_POINTAGE(
   id_session_pointage,
   debut_pause_pointage,
   fin_pause_pointage,
-  commentaire_pause_pointage
+  commentaire_pause_pointage,
+  id_motif_arret_session
 )
 
 ------------------------------------------------------------------
@@ -14,6 +15,7 @@ create table pause_pointage (
   debut_pause_pointage timestamp not null default now(),
   fin_pause_pointage timestamp,
   commentaire_pause_pointage text,
+  id_motif_arret_session bigint,
 
   constraint fk_pause_pointage_session_pointage
     foreign key (id_session_pointage)
@@ -24,5 +26,9 @@ create table pause_pointage (
       fin_pause_pointage is null
       or
       debut_pause_pointage < fin_pause_pointage
-    )
+    ),
+
+  constraint fk_pause_pointage_motif_arret_session
+    foreign key (id_motif_arret_session)
+    references motif_arret_session(id_motif_arret_session)
 );

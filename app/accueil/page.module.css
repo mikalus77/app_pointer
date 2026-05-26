@@ -1,4 +1,4 @@
-.page {
+﻿.page {
   --topbar-height: 59px;
   --middle-zone-height: calc(var(--topbar-height) * 1.039);
   --soft-light-gray: #e6eaef;
@@ -233,15 +233,31 @@
   display: flex;
   align-items: flex-end;
   gap: 0;
-  width: 80%;
+  width: fit-content;
   min-height: 42px;
   box-sizing: border-box;
 }
 
 .agendaTabStrip .tabButton {
   flex: 0 0 auto;
-  min-width: 190px;
-  padding: 0.5rem 0.7rem;
+  min-width: 150px;
+  border: 0;
+  background-color: var(--soft-light-gray);
+  color: #2a3342;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.3px;
+  font-weight: 500;
+  padding: 0.5rem 0.75rem;
+  text-align: center;
+  white-space: nowrap;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  cursor: pointer;
+}
+
+.agendaTabStrip .tabButton.tabButtonActive {
+  background-color: #f5f7fa;
+  font-weight: 600;
 }
 
 .agendaHeader {
@@ -465,6 +481,8 @@
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.05em;
+  border: 0;
+  cursor: pointer;
 }
 
 .daySummaryTotalReached {
@@ -502,6 +520,7 @@
   min-width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  cursor: pointer;
 }
 
 .daySummaryTaskMain {
@@ -765,6 +784,7 @@
   font-size: 14.4px;
   font-weight: 500;
   letter-spacing: 0.05em;
+  cursor: pointer;
 }
 
 .monthDetailSummaryTotalReached {
@@ -979,6 +999,7 @@
 .monthDetailTaskCard {
   min-width: 0;
   max-width: 100%;
+  cursor: pointer;
 }
 
 .pointageReviewTaskTitle {
@@ -1070,15 +1091,17 @@
 }
 
 .tabButton {
-  flex: 1 1 50%;
+  flex: 0 0 auto;
+  min-width: 84px;
   border: 0;
   background-color: var(--soft-light-gray);
   color: #2a3342;
   font-family: "Poppins", sans-serif;
   font-size: 14.3px;
   font-weight: 500;
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.7rem;
   text-align: center;
+  white-space: nowrap;
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
   cursor: pointer;
@@ -2044,6 +2067,390 @@
   background-color: rgba(160, 184, 207, 0.44);
 }
 
+.pointageBoundsPanel {
+  width: 252px;
+  background-color: #f5f7fa;
+  border: 1px solid #dce4ee;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 14px 30px rgba(10, 25, 45, 0.22);
+  position: relative;
+}
+
+.pointageBoundsClose {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #c2d3e6;
+  background-color: #f7f9fc;
+  color: #2b4f7e;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.pointageBoundsDate {
+  margin: 0 0 0.75rem;
+  color: #2f5c89;
+  font-family: "Poppins", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pointageBoundsLine {
+  margin: 0.35rem 0 0;
+  color: #3f5d7d;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pointageBoundsStopReason {
+  color: #d21d25;
+  text-transform: uppercase;
+}
+
+.taskSessionsPanel {
+  width: 560px;
+  max-width: min(92vw, 560px);
+}
+
+.taskSessionLine {
+  white-space: nowrap;
+}
+
+.tasksWrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px 14px;
+  box-sizing: border-box;
+}
+
+.tasksToolbar {
+  margin-bottom: 27px;
+}
+
+.tasksSearchInput {
+  width: min(520px, 100%);
+  height: 42px;
+  border: 1px solid #b7cbe3;
+  border-radius: 10px;
+  background: #f7f9fc;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 14px;
+  outline: none;
+}
+
+.tasksSearchInput:focus {
+  border-color: #2f5c89;
+  box-shadow: 0 0 0 2px rgba(47, 92, 137, 0.14);
+}
+
+.tasksBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
+  padding-right: 4px;
+  padding-bottom: 140px;
+}
+
+.tasksTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  border: 1px solid #c8d6e7;
+  border-radius: 12px;
+  overflow: visible;
+  background: #f8fafd;
+}
+
+.tasksTable thead th {
+  background: #e5e9ef;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #c8d6e7;
+}
+
+.tasksSortButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tasksTable thead th:nth-child(1),
+.tasksTable tbody td:nth-child(1) {
+  width: 23%;
+}
+
+.tasksTable thead th:nth-child(2),
+.tasksTable tbody td:nth-child(2) {
+  width: 43%;
+}
+
+.tasksTable thead th:nth-child(3),
+.tasksTable tbody td:nth-child(3) {
+  width: 12%;
+}
+
+.tasksTable thead th:nth-child(4),
+.tasksTable tbody td:nth-child(4) {
+  width: 14%;
+}
+
+.tasksTable thead th:nth-child(5),
+.tasksTable tbody td:nth-child(5) {
+  width: 8%;
+}
+
+.tasksTable thead th:not(:last-child),
+.tasksTable tbody td:not(:last-child) {
+  border-right: 1px solid #d3dfec;
+}
+
+.tasksTable tbody tr:not(:last-child) td {
+  border-bottom: 1px solid #d3dfec;
+}
+
+.tasksTable tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  text-align: center;
+  position: relative;
+  overflow: visible;
+}
+
+.tasksTable tbody tr {
+  position: relative;
+  overflow: visible;
+}
+
+.taskTitleCell,
+.taskDescriptionCell,
+.taskDurationCell {
+  margin: 0;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.2px;
+  font-weight: 440;
+  min-width: 0;
+}
+
+.taskTitleCell,
+.taskDescriptionCell {
+  white-space: nowrap;
+}
+
+.taskDescriptionCell {
+  color: #49668a;
+}
+
+.taskPriorityCell {
+  text-align: center;
+}
+
+.priorityGauge {
+  width: 90px;
+  height: 7px;
+  border-radius: 999px;
+  border: 1px solid #b8cce3;
+  background:
+    linear-gradient(
+      to right,
+      #2fbe67 0%,
+      #2fbe67 25%,
+      #d8c83f 25%,
+      #d8c83f 50%,
+      #e69a36 50%,
+      #e69a36 75%,
+      #d64e4e 75%,
+      #d64e4e 100%
+    );
+  position: relative;
+  margin: 0 auto;
+}
+
+.priorityGaugeCursor {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #2f4f76;
+  box-shadow: 0 1px 4px rgba(16, 35, 58, 0.25);
+  transform: translate(-50%, -50%);
+}
+
+.taskDurationCell {
+  text-align: right;
+  font-family: "Consolas", "Courier New", monospace;
+  font-weight: 600;
+  color: #2b5a86;
+}
+
+.taskDurationOnTime {
+  color: #1f8a4d;
+}
+
+.taskDurationLate {
+  color: #c93b3b;
+}
+
+.tasksStateText {
+  margin: 8px 0 0;
+  color: #466488;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tasksEmptyState {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tasksEmptyState .tasksStateText {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #4a6381;
+}
+
+.taskUsersDetails {
+  position: relative;
+  display: inline-block;
+  z-index: 1;
+}
+
+.taskUsersDetails:hover .taskUsersMenu,
+.taskUsersDetails:focus-within .taskUsersMenu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.taskUsersDetails:hover,
+.taskUsersDetails:focus-within {
+  z-index: 120;
+}
+
+.taskUsersTrigger {
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  user-select: none;
+  color: #1f4f83;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e8f2ff 0%, #d6e8ff 100%);
+  border: 1px solid #8fb3db;
+}
+
+.taskUsersMenu {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+  position: absolute;
+  z-index: 25;
+  right: 0;
+  bottom: calc(100% + 6px);
+  top: auto;
+  min-width: 220px;
+  max-width: 280px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid #c8d6e7;
+  border-radius: 10px;
+  background: #f8fafd;
+  box-shadow: 0 10px 20px rgba(19, 39, 66, 0.16);
+  padding: 8px 10px;
+  box-sizing: border-box;
+}
+
+.taskUsersList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.taskUsersItem {
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.taskUsersEmpty {
+  margin: 0;
+  color: #5d7897;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.hoverScrollCell {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hoverScrollText {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.hoverScrollCellActive:hover .hoverScrollText {
+  animation: hoverScrollBidi 5.2s ease-in-out infinite alternate;
+}
+
+@keyframes hoverScrollBidi {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(var(--hover-scroll-distance, 0px) * -1));
+  }
+}
+
 @keyframes cometLeft {
   0% {
     transform: translateX(0);
@@ -2127,3 +2534,6 @@
     grid-template-columns: repeat(7, minmax(140px, 1fr));
   }
 }
+
+
+

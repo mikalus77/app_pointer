@@ -1,0 +1,864 @@
+.agendaTabStrip {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  width: fit-content;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+
+.tabButton {
+  flex: 0 0 auto;
+  min-width: 180px;
+  border: 0;
+  background-color: #e6eaef;
+  color: #2a3342;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.3px;
+  font-weight: 500;
+  padding: 0.5rem 0.7rem;
+  text-align: center;
+  white-space: nowrap;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  cursor: pointer;
+}
+
+.tabButtonActive {
+  background-color: #f5f7fa;
+  font-weight: 600;
+}
+
+.tasksWrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px 14px;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.tasksToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 27px;
+}
+
+.tasksSearchInput {
+  width: min(520px, 100%);
+  height: 42px;
+  border: 1px solid #b7cbe3;
+  border-radius: 10px;
+  background: #f7f9fc;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 14px;
+  outline: none;
+}
+
+.tasksSearchInput:focus {
+  border-color: #2f5c89;
+  box-shadow: 0 0 0 2px rgba(47, 92, 137, 0.14);
+}
+
+.addTaskButton {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #8fb3db;
+  background: linear-gradient(180deg, #ecf3fc 0%, #eff4fc 100%);
+  color: #1f4f83;
+  font-family: "Poppins", sans-serif;
+  font-size: 13.4px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.addTaskButton:hover {
+  filter: brightness(0.98);
+}
+
+.tasksBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: visible;
+  overflow-x: auto;
+  display: block;
+  padding-right: 4px;
+  padding-bottom: 140px;
+}
+
+.tasksTable {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  border: 1px solid #c8d6e7;
+  border-radius: 12px;
+  overflow: visible;
+  background: #f8fafd;
+  position: relative;
+}
+
+.tasksTable thead {
+  position: relative;
+  z-index: 1;
+}
+
+.tasksTable tbody {
+  position: relative;
+  z-index: 20;
+}
+
+.tasksTable thead th {
+  position: relative;
+  z-index: 1;
+  background: #e5e9ef;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #c8d6e7;
+}
+
+.tasksSortButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tasksTable thead th:nth-child(1),
+.tasksTable tbody td:nth-child(1) {
+  width: 24%;
+}
+
+.tasksTable thead th:nth-child(2),
+.tasksTable tbody td:nth-child(2) {
+  width: 44%;
+}
+
+.tasksTable thead th:nth-child(3),
+.tasksTable tbody td:nth-child(3) {
+  width: 11%;
+}
+
+.tasksTable thead th:nth-child(4),
+.tasksTable tbody td:nth-child(4) {
+  width: 9%;
+}
+
+.tasksTable thead th:nth-child(5),
+.tasksTable tbody td:nth-child(5) {
+  width: 12%;
+}
+
+.tasksTable thead th:not(:last-child),
+.tasksTable tbody td:not(:last-child) {
+  border-right: 1px solid #d3dfec;
+}
+
+.tasksTable tbody tr:not(:last-child) td {
+  border-bottom: 1px solid #d3dfec;
+}
+
+.tasksTable tbody td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  text-align: center;
+  position: relative;
+  overflow: visible;
+  z-index: 2;
+}
+
+.tasksTable tbody td:nth-child(5) {
+  padding: 10px 12px;
+}
+
+.tasksTable tbody tr {
+  position: relative;
+  overflow: visible;
+  z-index: 1;
+}
+
+.tasksTable tbody tr:hover,
+.tasksTable tbody tr:focus-within {
+  z-index: 2000;
+}
+
+.taskTitleCell,
+.taskDescriptionCell {
+  margin: 0;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14.2px;
+  font-weight: 440;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.taskDescriptionCell {
+  color: #49668a;
+}
+
+.taskTitleStatusActive,
+.taskTitleStatusInactive {
+  position: relative;
+}
+
+.taskTitleStatusActive::before,
+.taskTitleStatusInactive::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-right: 12px solid transparent;
+}
+
+.taskTitleStatusActive::before {
+  border-top-color: #2fbe67;
+}
+
+.taskTitleStatusInactive::before {
+  border-top-color: #d64e4e;
+}
+
+.priorityGauge {
+  width: 90px;
+  height: 7px;
+  border-radius: 999px;
+  border: 1px solid #b8cce3;
+  background:
+    linear-gradient(
+      to right,
+      #2fbe67 0%,
+      #2fbe67 25%,
+      #d8c83f 25%,
+      #d8c83f 50%,
+      #e69a36 50%,
+      #e69a36 75%,
+      #d64e4e 75%,
+      #d64e4e 100%
+    );
+  position: relative;
+  margin: 0 auto;
+}
+
+.priorityGaugeCursor {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #fff;
+  border: 1.5px solid #2f4f76;
+  box-shadow: 0 1px 4px rgba(16, 35, 58, 0.25);
+  transform: translate(-50%, -50%);
+}
+
+.tasksStateText {
+  margin: 8px 0 0;
+  color: #466488;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tasksEmptyState {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tasksEmptyState .tasksStateText {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #4a6381;
+}
+
+.taskUsersDetails {
+  position: relative;
+  display: inline-block;
+  z-index: 1;
+}
+
+.taskUsersDetails:hover .taskUsersMenu,
+.taskUsersDetails:focus-within .taskUsersMenu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.taskUsersDetails:hover,
+.taskUsersDetails:focus-within {
+  z-index: 5000;
+}
+
+.taskUsersTrigger {
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  user-select: none;
+  color: #1f4f83;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e8f2ff 0%, #d6e8ff 100%);
+  border: 1px solid #8fb3db;
+}
+
+.taskUsersMenu {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+  position: absolute;
+  z-index: 20000;
+  right: 0;
+  bottom: calc(100% + 6px);
+  top: auto;
+  min-width: 220px;
+  max-width: 280px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid #c8d6e7;
+  border-radius: 10px;
+  background: #f8fafd;
+  box-shadow: 0 10px 20px rgba(19, 39, 66, 0.16);
+  padding: 8px 10px;
+  box-sizing: border-box;
+}
+
+.taskUsersList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.taskUsersItem {
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.taskUsersEmpty {
+  margin: 0;
+  color: #5d7897;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.hoverScrollCell {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.hoverScrollText {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.hoverScrollCellActive:hover .hoverScrollText,
+.hoverScrollCellActive:focus-within .hoverScrollText {
+  animation: hover-scroll-x 7s ease-in-out infinite alternate;
+}
+
+.actionsCell {
+  text-align: center;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.actionButtons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 auto;
+  max-width: none;
+  width: auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.actionButton {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  flex: 0 0 28px;
+  border-radius: 8px;
+  border: 1px solid #b7cbe3;
+  background: linear-gradient(180deg, #f9fcff 0%, #edf4fb 100%);
+  color: #2f4f76;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  border-color: #8fb3db;
+  box-shadow: 0 3px 8px rgba(38, 66, 98, 0.18);
+}
+
+.actionButtonInfo {
+  color: #1f4f83;
+}
+
+.actionButtonEdit {
+  color: #1f8a4d;
+}
+
+.actionButtonDelete {
+  color: #c93b3b;
+}
+
+@keyframes hover-scroll-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(var(--hover-scroll-distance) * -1));
+  }
+}
+.taskInfoWrap {
+  position: relative;
+  display: inline-flex;
+  z-index: 200;
+}
+
+.taskInfoWrap:hover .taskInfoMenu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.taskInfoWrap:hover,
+.taskInfoWrap:focus-within {
+  z-index: 5000;
+}
+
+.taskInfoMenu {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  top: auto;
+  min-width: 260px;
+  max-width: 320px;
+  border: 1px solid #c8d6e7;
+  border-radius: 10px;
+  background: #f8fafd;
+  box-shadow: 0 10px 20px rgba(19, 39, 66, 0.16);
+  padding: 10px 12px;
+  text-align: left;
+  z-index: 20000;
+}
+
+.taskInfoLine {
+  margin: 0;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.taskInfoLine + .taskInfoLine {
+  margin-top: 6px;
+}
+
+.taskInfoLabel {
+  font-weight: 700;
+}
+
+.taskInfoValue {
+  font-weight: 500;
+}
+
+.taskStatusDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: middle;
+}
+
+.taskStatusDotActive {
+  background: #2fbe67;
+  box-shadow: 0 0 0 1px rgba(47, 190, 103, 0.28);
+}
+
+.taskStatusDotInactive {
+  background: #d64e4e;
+  box-shadow: 0 0 0 1px rgba(214, 78, 78, 0.28);
+}
+
+.deleteOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 27, 45, 0.35);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.deleteModal {
+  width: min(440px, 92vw);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #8fb3db;
+  box-shadow: 0 18px 45px rgba(9, 20, 35, 0.28);
+  background: #f8fafd;
+}
+
+.deleteModalHead {
+  background: #16365f;
+  color: #fff;
+  text-align: center;
+  font-family: "Poppins", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 10px 14px;
+}
+
+.deleteModalBody {
+  background: #ffffff;
+  padding: 18px 18px 16px;
+}
+
+.deleteText {
+  margin: 0;
+  text-align: center;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.deletePasswordInput {
+  width: 100%;
+  margin-top: 12px;
+  height: 40px;
+  border: 1px solid #b7cbe3;
+  border-radius: 10px;
+  background: #f7f9fc;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.deletePasswordInput:focus {
+  border-color: #2f5c89;
+  box-shadow: 0 0 0 2px rgba(47, 92, 137, 0.14);
+}
+
+.passwordVisibilityButton {
+  margin-top: 8px;
+  border: 0;
+  background: transparent;
+  color: #2f5c89;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.6px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.deleteError {
+  margin: 8px 0 0;
+  color: #c93b3b;
+  text-align: center;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.8px;
+  font-weight: 600;
+}
+
+.deleteActions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.deleteCta {
+  min-width: 120px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.deleteCta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(0.97);
+}
+
+.deleteCta:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.deleteDanger {
+  background: #fbe4e4;
+  color: #be2f2f;
+  border-color: #efb8b8;
+}
+
+.deleteCancel {
+  background: #eef3f9;
+  color: #36587f;
+  border-color: #c8d6e7;
+}
+
+.taskFormAddCta {
+  background: linear-gradient(180deg, #e9fbf1 0%, #daf6e8 100%);
+  color: #2f9a67;
+  border-color: #58b98b;
+}
+
+.taskFormEditCta {
+  background: linear-gradient(180deg, #dcecff 0%, #cde2fb 100%);
+  color: #18497d;
+  border-color: #6e9fd1;
+}
+
+.taskFormModal {
+  width: min(560px, calc(100vw - 40px));
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #8fb3db;
+  background: #f8fbff;
+  box-shadow: 0 14px 34px rgba(16, 33, 57, 0.28);
+}
+
+.taskFormBody {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+  background: #ffffff;
+}
+
+.taskFormGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.taskFormField {
+  display: grid;
+  gap: 6px;
+}
+
+.taskFormLabel {
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.taskFormInput,
+.taskFormTextarea,
+.taskFormSelect {
+  width: 100%;
+  border: 1px solid #b7cbe3;
+  border-radius: 10px;
+  background: #f7f9fc;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.taskFormInput,
+.taskFormSelect {
+  height: 40px;
+  padding: 0 12px;
+}
+
+.taskFormTextarea {
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 96px;
+}
+
+.taskFormInput:focus,
+.taskFormTextarea:focus,
+.taskFormSelect:focus {
+  border-color: #2f5c89;
+  box-shadow: 0 0 0 2px rgba(47, 92, 137, 0.14);
+}
+
+.assignmentModal {
+  width: min(760px, calc(100vw - 40px));
+  max-height: min(760px, calc(100vh - 40px));
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid #8fb3db;
+  background: #f8fbff;
+  box-shadow: 0 14px 34px rgba(16, 33, 57, 0.28);
+  position: relative;
+}
+
+.assignmentClose {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #b7cbe3;
+  background: linear-gradient(180deg, #f9fcff 0%, #edf4fb 100%);
+  color: #2f5c89;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.assignmentBody {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background: #ffffff;
+}
+
+.assignmentList {
+  max-height: 420px;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.assignmentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d2dfec;
+  border-radius: 10px;
+  background: #f8fafd;
+  padding: 10px 12px;
+}
+
+.assignmentUserName {
+  margin: 0;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.assignmentControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assignmentToggle {
+  min-width: 92px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-family: "Poppins", sans-serif;
+  font-size: 12.8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.assignmentToggleAdd {
+  background: #e9fbf1;
+  color: #2f9a67;
+  border-color: #58b98b;
+}
+
+.assignmentToggleRemove {
+  background: #fbe4e4;
+  color: #be2f2f;
+  border-color: #efb8b8;
+}
+
+.assignmentDateInput {
+  height: 32px;
+  border: 1px solid #b7cbe3;
+  border-radius: 9px;
+  background: #f7f9fc;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 10px;
+  outline: none;
+}
+
+.assignmentDateInput:focus {
+  border-color: #2f5c89;
+  box-shadow: 0 0 0 2px rgba(47, 92, 137, 0.14);
+}
+
+.assignmentFooter {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}

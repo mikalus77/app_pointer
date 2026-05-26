@@ -6,6 +6,7 @@ import styles from './app-shell.module.css'
 
 type AppShellProps = {
   connectedUsername: string
+  userRole?: 'ADMIN' | 'EMPLOYE'
   activeTab: 'tab1' | 'tab2'
   activeMenu: ActiveMenu
   activeDemandesSubMenu: 'nouvelle' | 'voir' | null
@@ -24,6 +25,8 @@ type AppShellProps = {
     id: number
     firstName: string
     lastName: string
+    statusCode?: string
+    hasActiveSession?: boolean
   }>
   usersListLoading?: boolean
   selectedUserId?: number | null
@@ -33,6 +36,7 @@ type AppShellProps = {
 
 export function AppShell({
   connectedUsername,
+  userRole = 'EMPLOYE',
   activeTab,
   activeMenu,
   activeDemandesSubMenu,
@@ -53,11 +57,13 @@ export function AppShell({
   onSelectUser,
   children,
 }: AppShellProps) {
+  const isAdmin = userRole === 'ADMIN'
+  const resolvedActiveTab = isAdmin ? activeTab : 'tab1'
   const isSuiviActivitesActive = [
     'gestion_demandes',
     'gestion_taches',
     'gestion_pointages',
-  ].includes(activeMenu)
+  ].includes(activeMenu) && isAdmin
 
   return (
     <div className={styles.page}>
@@ -79,16 +85,13 @@ export function AppShell({
               </span>
             </div>
             <div className={styles.profileDropdown} role="menu" aria-label="Menu utilisateur">
-              <button type="button" className={styles.profileDropdownItem} role="menuitem">
-                Paramètres
-              </button>
               <button
                 type="button"
                 className={styles.profileDropdownItem}
                 role="menuitem"
                 onClick={onLogout}
               >
-                Se déconnecter
+                Déconnexion
               </button>
             </div>
           </div>
@@ -100,28 +103,30 @@ export function AppShell({
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'tab1'}
-            className={`${styles.tabButton} ${activeTab === 'tab1' ? styles.tabButtonActive : ''}`}
+            aria-selected={resolvedActiveTab === 'tab1'}
+            className={`${styles.tabButton} ${resolvedActiveTab === 'tab1' ? styles.tabButtonActive : ''}`}
             onClick={() => onTabChange('tab1')}
           >
             Mon espace
           </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'tab2'}
-            className={`${styles.tabButton} ${activeTab === 'tab2' ? styles.tabButtonActive : ''}`}
-            onClick={() => onTabChange('tab2')}
-          >
-            Utilisateurs
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={resolvedActiveTab === 'tab2'}
+              className={`${styles.tabButton} ${resolvedActiveTab === 'tab2' ? styles.tabButtonActive : ''}`}
+              onClick={() => onTabChange('tab2')}
+            >
+              Utilisateurs
+            </button>
+          ) : null}
         </div>
         <div className={styles.middleContent}>{middleContent}</div>
       </div>
 
       <main className={styles.layout}>
         <aside className={styles.menuZone} aria-label="Zone menu">
-          {activeTab === 'tab1' ? (
+          {resolvedActiveTab === 'tab1' ? (
             <nav className={styles.verticalMenu} aria-label="Menu principal">
               <button
                 type="button"
@@ -144,99 +149,103 @@ export function AppShell({
               >
                 Mes tâches
               </button>
-              <button
-                type="button"
-                className={`${styles.menuItem} ${activeMenu === 'demandes' ? styles.menuItemActive : ''}`}
-                onClick={() => onOpenMenu('demandes', { demandesSubMenu: null })}
-              >
-                Mes demandes
-              </button>
-              {activeMenu === 'demandes' ? (
-                <div className={styles.subMenu} aria-label="Sous-menu Mes demandes">
+              {isAdmin ? (
+                <>
                   <button
                     type="button"
-                    className={`${styles.subMenuItem} ${
-                      activeDemandesSubMenu === 'nouvelle' ? styles.subMenuItemActive : ''
-                    }`}
-                    onClick={() => onOpenMenu('demandes', { demandesSubMenu: 'nouvelle' })}
+                    className={`${styles.menuItem} ${activeMenu === 'demandes' ? styles.menuItemActive : ''}`}
+                    onClick={() => onOpenMenu('demandes', { demandesSubMenu: null })}
                   >
-                    Nouvelle demande
+                    Mes demandes
                   </button>
+                  {activeMenu === 'demandes' ? (
+                    <div className={styles.subMenu} aria-label="Sous-menu Mes demandes">
+                      <button
+                        type="button"
+                        className={`${styles.subMenuItem} ${
+                          activeDemandesSubMenu === 'nouvelle' ? styles.subMenuItemActive : ''
+                        }`}
+                        onClick={() => onOpenMenu('demandes', { demandesSubMenu: 'nouvelle' })}
+                      >
+                        Nouvelle demande
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.subMenuItem} ${
+                          activeDemandesSubMenu === 'voir' ? styles.subMenuItemActive : ''
+                        }`}
+                        onClick={() => onOpenMenu('demandes', { demandesSubMenu: 'voir' })}
+                      >
+                        Consulter mes demandes
+                      </button>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
-                    className={`${styles.subMenuItem} ${
-                      activeDemandesSubMenu === 'voir' ? styles.subMenuItemActive : ''
-                    }`}
-                    onClick={() => onOpenMenu('demandes', { demandesSubMenu: 'voir' })}
-                  >
-                    Consulter mes demandes
-                  </button>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className={`${styles.menuItem} ${isSuiviActivitesActive ? styles.menuItemActive : ''}`}
-                onClick={() => onOpenMenu('gestion_taches')}
-              >
-                Suivi des activités
-              </button>
-              {isSuiviActivitesActive ? (
-                <div className={styles.subMenu} aria-label="Sous-menu Suivi des activités">
-                  <button
-                    type="button"
-                    className={`${styles.subMenuItem} ${
-                      activeMenu === 'gestion_taches' ? styles.subMenuItemActive : ''
-                    }`}
+                    className={`${styles.menuItem} ${isSuiviActivitesActive ? styles.menuItemActive : ''}`}
                     onClick={() => onOpenMenu('gestion_taches')}
                   >
-                    Gestion des tâches
+                    Suivi des activités
                   </button>
+                  {isSuiviActivitesActive ? (
+                    <div className={styles.subMenu} aria-label="Sous-menu Suivi des activités">
+                      <button
+                        type="button"
+                        className={`${styles.subMenuItem} ${
+                          activeMenu === 'gestion_taches' ? styles.subMenuItemActive : ''
+                        }`}
+                        onClick={() => onOpenMenu('gestion_taches')}
+                      >
+                        Gestion des tâches
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.subMenuItem} ${
+                          activeMenu === 'gestion_demandes' ? styles.subMenuItemActive : ''
+                        }`}
+                        onClick={() => onOpenMenu('gestion_demandes')}
+                      >
+                        Gestion des demandes
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.subMenuItem} ${
+                          activeMenu === 'gestion_pointages' ? styles.subMenuItemActive : ''
+                        }`}
+                        onClick={() => onOpenMenu('gestion_pointages')}
+                      >
+                        Gestion des pointages
+                      </button>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
-                    className={`${styles.subMenuItem} ${
-                      activeMenu === 'gestion_demandes' ? styles.subMenuItemActive : ''
+                    className={`${styles.menuItem} ${
+                      activeMenu === 'gestion_bdd' ? styles.menuItemActive : ''
                     }`}
-                    onClick={() => onOpenMenu('gestion_demandes')}
+                    onClick={() =>
+                      onOpenMenu('gestion_bdd', {
+                        configurationSubMenu: 'taches',
+                        configurationTab: 'donnees',
+                      })
+                    }
                   >
-                    Gestion des demandes
+                    Configuration
                   </button>
-                  <button
-                    type="button"
-                    className={`${styles.subMenuItem} ${
-                      activeMenu === 'gestion_pointages' ? styles.subMenuItemActive : ''
-                    }`}
-                    onClick={() => onOpenMenu('gestion_pointages')}
-                  >
-                    Gestion des pointages
-                  </button>
-                </div>
-              ) : null}
-              <button
-                type="button"
-                className={`${styles.menuItem} ${
-                  activeMenu === 'gestion_bdd' ? styles.menuItemActive : ''
-                }`}
-                onClick={() =>
-                  onOpenMenu('gestion_bdd', {
-                    configurationSubMenu: 'taches',
-                    configurationTab: 'donnees',
-                  })
-                }
-              >
-                Configuration
-              </button>
-              {activeMenu === 'gestion_bdd' ? (
-                <div className={styles.subMenu} aria-label="Sous-menu Configuration">
-                  <button
-                    type="button"
-                    className={`${styles.subMenuItem} ${
-                      activeConfigurationSubMenu === 'taches' ? styles.subMenuItemActive : ''
-                    }`}
-                    onClick={() => onConfigurationSubMenuChange('taches')}
-                  >
-                    Tâches
-                  </button>
-                </div>
+                  {activeMenu === 'gestion_bdd' ? (
+                    <div className={styles.subMenu} aria-label="Sous-menu Configuration">
+                      <button
+                        type="button"
+                        className={`${styles.subMenuItem} ${
+                          activeConfigurationSubMenu === 'taches' ? styles.subMenuItemActive : ''
+                        }`}
+                        onClick={() => onConfigurationSubMenuChange('taches')}
+                      >
+                        Tâches
+                      </button>
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </nav>
           ) : (
@@ -262,6 +271,36 @@ export function AppShell({
                         </span>
                         <span className={styles.userLabel}>
                           {`${user.firstName} ${user.lastName}`.trim()}
+                        </span>
+                        <span className={styles.userStatusWrap} aria-hidden="true">
+                          {user.statusCode === 'EN_ATTENTE' ? (
+                            <span
+                              className={`${styles.userStatusBadge} ${styles.userStatusPending}`}
+                              title="Compte en attente d'activation"
+                            >
+                              ⏳
+                            </span>
+                          ) : user.statusCode === 'DESACTIVE' ? (
+                            <span
+                              className={`${styles.userStatusBadge} ${styles.userStatusDisabled}`}
+                              title="Compte désactivé"
+                            >
+                              ⛔
+                            </span>
+                          ) : (
+                            <span
+                              className={`${styles.userStatusDot} ${
+                                user.hasActiveSession
+                                  ? styles.userStatusDotOnline
+                                  : styles.userStatusDotOffline
+                              }`}
+                              title={
+                                user.hasActiveSession
+                                  ? 'Utilisateur connecté (session en cours)'
+                                  : 'Utilisateur non connecté'
+                              }
+                            />
+                          )}
                         </span>
                       </button>
                     </li>
