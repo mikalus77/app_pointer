@@ -62,7 +62,6 @@ export function AppShell({
   const isSuiviActivitesActive = [
     'gestion_demandes',
     'gestion_taches',
-    'gestion_pointages',
   ].includes(activeMenu) && isAdmin
 
   return (
@@ -206,15 +205,6 @@ export function AppShell({
                         onClick={() => onOpenMenu('gestion_demandes')}
                       >
                         Gestion des demandes
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.subMenuItem} ${
-                          activeMenu === 'gestion_pointages' ? styles.subMenuItemActive : ''
-                        }`}
-                        onClick={() => onOpenMenu('gestion_pointages')}
-                      >
-                        Gestion des pointages
                       </button>
                     </div>
                   ) : null}

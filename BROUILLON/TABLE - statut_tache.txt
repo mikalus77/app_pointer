@@ -1,0 +1,27 @@
+STATUT_UTILISATEUR(
+  id_statut_tache,  
+  code_statut_tache,
+  libelle_statut_tache,
+  actif
+)
+
+-----------------------------------------------------------------------------------------------------------------
+
+create table statut_tache (
+  id_statut_tache bigint generated always as identity primary key,
+  code_statut_tache varchar(40) not null unique,
+  libelle_statut_tache varchar(80) not null,
+  actif boolean not null default true,
+
+  constraint statut_tache_code_uppercase
+    check (
+      code_statut_tache = upper(code_statut_tache)
+    )
+);
+
+-----------------------------------------------------------------------------------------------------------------
+
+insert into statut_tache (code_statut_tache, libelle_statut_tache)
+values ('EN_COURS', 'Tâche en cours'),
+       ('REUSSIE', 'Tâche réussie'),
+       ('ECHOUEE', 'Tâche échouée');

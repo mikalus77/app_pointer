@@ -34,7 +34,8 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 16px 18px 14px;
+  margin-top: -10px;
+  padding: 0 18px 14px;
   box-sizing: border-box;
   overflow: visible;
 }
@@ -217,17 +218,21 @@
 .taskDurationValue {
   font-family: "Consolas", "Courier New", monospace;
   font-weight: 700;
-  font-size: 1.05em;
+  font-size: 1.09em;
 }
 
 .taskDurationUnit {
   font-size: 0.69em;
   font-weight: 700;
-  vertical-align: top;
+  vertical-align: baseline;
   line-height: 1;
-  position: relative;
-  top: 0.22em;
   letter-spacing: 0.01em;
+  margin-left: 2px;
+}
+
+.taskDurationSep {
+  display: inline-block;
+  margin: 0 8px;
 }
 
 .taskDurationScroll {
@@ -240,6 +245,10 @@
 
 .taskDurationLate {
   color: #be4f4f;
+}
+
+.taskDurationNoDeadline {
+  color: #6f8fae;
 }
 
 .tasksStateText {

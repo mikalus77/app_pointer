@@ -19,6 +19,13 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [erreurConnexion, setErreurConnexion] = useState("");
+  const [showForgotPasswordForm, setShowForgotPasswordForm] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState("");
+  const [forgotPasswordConfirm, setForgotPasswordConfirm] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showForgotPasswordConfirm, setShowForgotPasswordConfirm] = useState(false);
+  const [erreurForgotPassword, setErreurForgotPassword] = useState("");
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState("");
 
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
@@ -123,6 +130,53 @@ export default function Home() {
     setAdresse("");
   };
 
+  const handleForgotPassword = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setErreurForgotPassword("");
+    setForgotPasswordSuccess("");
+
+    if (!username.trim()) {
+      setErreurForgotPassword("Veuillez saisir le nom d'utilisateur !");
+      return;
+    }
+
+    if (!forgotPassword || !forgotPasswordConfirm) {
+      setErreurForgotPassword("Veuillez saisir et confirmer le mot de passe !");
+      return;
+    }
+
+    if (forgotPassword !== forgotPasswordConfirm) {
+      setErreurForgotPassword("Les mots de passe ne correspondent pas !");
+      return;
+    }
+
+    const response = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        newPassword: forgotPassword,
+      }),
+    });
+
+    const responseData = (await response.json().catch(() => null)) as
+      | { success?: boolean; error?: string }
+      | null;
+
+    if (!response.ok || !responseData?.success) {
+      setErreurForgotPassword(responseData?.error ?? "Impossible de modifier le mot de passe !");
+      return;
+    }
+
+    setForgotPasswordSuccess("Mot de passe mis à jour avec succès.");
+    setForgotPassword("");
+    setForgotPasswordConfirm("");
+    setShowForgotPassword(false);
+    setShowForgotPasswordConfirm(false);
+  };
+
   const tabStyle = (tab: AuthTab) => ({
     flex: 1,
     padding: "8px 0 10px",
@@ -193,51 +247,158 @@ export default function Home() {
         </div>
 
         {activeTab === "connexion" ? (
-          <form onSubmit={handleConnexion} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <input
-              type="text"
-              placeholder="Nom d'utilisateur"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              style={inputStyle}
-            />
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {!showForgotPasswordForm ? (
+              <form onSubmit={handleConnexion} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <input
+                  type="text"
+                  placeholder="Nom d'utilisateur"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+                <input
+                  type={showLoginPassword ? "text" : "password"}
+                  placeholder="Mot de passe"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
 
-            <input
-              type={showLoginPassword ? "text" : "password"}
-              placeholder="Mot de passe"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={inputStyle}
-            />
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
+                  <input
+                    type="checkbox"
+                    checked={showLoginPassword}
+                    onChange={(e) => setShowLoginPassword(e.target.checked)}
+                  />
+                  Voir le mot de passe
+                </label>
 
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
-              <input
-                type="checkbox"
-                checked={showLoginPassword}
-                onChange={(e) => setShowLoginPassword(e.target.checked)}
-              />
-              Voir le mot de passe
-            </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPasswordForm(true);
+                    setErreurConnexion("");
+                    setErreurForgotPassword("");
+                    setForgotPasswordSuccess("");
+                  }}
+                  style={{
+                    alignSelf: "flex-start",
+                    border: "none",
+                    background: "transparent",
+                    color: "#2e4a66",
+                    cursor: "pointer",
+                    padding: 0,
+                    textDecoration: "underline",
+                    fontSize: "14px",
+                  }}
+                >
+                  Mot de passe oublié ?
+                </button>
 
-            {erreurConnexion ? <p style={{ color: "red", margin: 0 }}>{erreurConnexion}</p> : null}
+                {erreurConnexion ? <p style={{ color: "red", margin: 0 }}>{erreurConnexion}</p> : null}
 
-            <button
-              type="submit"
-              style={{
-                padding: "12px",
-                borderRadius: "8px",
-                border: "none",
-                backgroundColor: "#2e4a66",
-                color: "white",
-                cursor: "pointer",
-                fontWeight: "600",
-              }}
-            >
-              Se connecter
-            </button>
-          </form>
+                <button
+                  type="submit"
+                  style={{
+                    padding: "12px",
+                    borderRadius: "8px",
+                    border: "none",
+                    backgroundColor: "#2e4a66",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                  }}
+                >
+                  Se connecter
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotPassword} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <input
+                  type="text"
+                  placeholder="Nom d'utilisateur"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+                <input
+                  type={showForgotPassword ? "text" : "password"}
+                  placeholder="Nouveau mot de passe"
+                  value={forgotPassword}
+                  onChange={(e) => setForgotPassword(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
+                  <input
+                    type="checkbox"
+                    checked={showForgotPassword}
+                    onChange={(e) => setShowForgotPassword(e.target.checked)}
+                  />
+                  Voir le mot de passe
+                </label>
+                <input
+                  type={showForgotPasswordConfirm ? "text" : "password"}
+                  placeholder="Confirmer le mot de passe"
+                  value={forgotPasswordConfirm}
+                  onChange={(e) => setForgotPasswordConfirm(e.target.value)}
+                  required
+                  style={inputStyle}
+                />
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
+                  <input
+                    type="checkbox"
+                    checked={showForgotPasswordConfirm}
+                    onChange={(e) => setShowForgotPasswordConfirm(e.target.checked)}
+                  />
+                  Voir le mot de passe
+                </label>
+
+                {erreurForgotPassword ? <p style={{ color: "red", margin: 0 }}>{erreurForgotPassword}</p> : null}
+                {forgotPasswordSuccess ? <p style={{ color: "#2a8a58", margin: 0 }}>{forgotPasswordSuccess}</p> : null}
+
+                <button
+                  type="submit"
+                  style={{
+                    padding: "12px",
+                    borderRadius: "8px",
+                    border: "none",
+                    backgroundColor: "#2e4a66",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                  }}
+                >
+                  Valider le nouveau mot de passe
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPasswordForm(false);
+                    setErreurForgotPassword("");
+                    setForgotPasswordSuccess("");
+                    setForgotPassword("");
+                    setForgotPasswordConfirm("");
+                  }}
+                  style={{
+                    padding: "12px",
+                    borderRadius: "8px",
+                    border: "1px solid #2e4a66",
+                    backgroundColor: "white",
+                    color: "#2e4a66",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                  }}
+                >
+                  Retour à la connexion
+                </button>
+              </form>
+            )}
+          </div>
         ) : (
           <form onSubmit={handleInscription} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <input

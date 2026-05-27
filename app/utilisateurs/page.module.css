@@ -337,12 +337,36 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 16px 18px 14px;
+  margin-top: -6px;
+  padding: 0 18px 14px;
   box-sizing: border-box;
 }
 
 .tasksToolbar {
   margin-bottom: 36px;
+}
+
+.tasksStatusTopRow {
+  margin-bottom: 28px;
+}
+
+.tasksStatusSwitch {
+  display: grid;
+  grid-template-columns: 1fr 2px 1fr 2px 1fr;
+  width: 100%;
+  align-items: center;
+  gap: 0;
+}
+
+.tasksStatusDivider {
+  justify-self: center;
+  width: 2px;
+  height: 32px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9fb9d8 0%, #6f8eb2 52%, #9fb9d8 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 0 8px rgba(82, 111, 147, 0.2);
 }
 
 .tasksSearchInput {
@@ -525,17 +549,21 @@
 .taskDurationValue {
   font-family: "Consolas", "Courier New", monospace;
   font-weight: 700;
-  font-size: 1.05em;
+  font-size: 1.12em;
 }
 
 .taskDurationUnit {
   font-size: 0.69em;
   font-weight: 700;
-  vertical-align: top;
+  vertical-align: baseline;
   line-height: 1;
-  position: relative;
-  top: 0.22em;
   letter-spacing: 0.01em;
+  margin-left: 2px;
+}
+
+.taskDurationSep {
+  display: inline-block;
+  margin: 0 8px;
 }
 
 .taskDurationScroll {
@@ -550,12 +578,32 @@
   color: #c93b3b;
 }
 
+.taskDurationNoDeadline {
+  color: #6f8fae;
+}
+
 .tasksStateText {
   margin: 8px 0 0;
   color: #466488;
   font-family: "Poppins", sans-serif;
   font-size: 14px;
   font-weight: 500;
+}
+
+.tasksEmptyState {
+  height: 100%;
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tasksEmptyState .tasksStateText {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #4a6381;
+  text-align: center;
 }
 
 .taskUsersDetails {

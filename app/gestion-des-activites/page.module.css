@@ -107,6 +107,10 @@
   position: relative;
 }
 
+.tasksTableSharp {
+  border-radius: 0;
+}
+
 .tasksTable thead {
   position: relative;
   z-index: 1;
@@ -341,8 +345,9 @@
   position: absolute;
   z-index: 20000;
   right: 0;
-  bottom: calc(100% + 6px);
-  top: auto;
+  left: auto;
+  top: calc(100% + 6px);
+  bottom: auto;
   min-width: 220px;
   max-width: 280px;
   max-height: 180px;
@@ -353,6 +358,11 @@
   box-shadow: 0 10px 20px rgba(19, 39, 66, 0.16);
   padding: 8px 10px;
   box-sizing: border-box;
+}
+
+.tasksTable tbody tr:nth-last-child(-n + 4) .taskUsersMenu {
+  top: auto;
+  bottom: calc(100% + 6px);
 }
 
 .taskUsersList {
@@ -484,10 +494,11 @@
   transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
   position: absolute;
   right: 0;
-  bottom: calc(100% + 8px);
-  top: auto;
+  left: auto;
+  top: calc(100% + 8px);
+  bottom: auto;
   min-width: 260px;
-  max-width: 320px;
+  max-width: min(320px, calc(100vw - 72px));
   border: 1px solid #c8d6e7;
   border-radius: 10px;
   background: #f8fafd;
@@ -495,6 +506,11 @@
   padding: 10px 12px;
   text-align: left;
   z-index: 20000;
+}
+
+.tasksTable tbody tr:nth-last-child(-n + 4) .taskInfoMenu {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 .taskInfoLine {

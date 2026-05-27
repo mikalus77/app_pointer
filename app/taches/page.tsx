@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import {
   useCallback,
@@ -33,6 +33,7 @@ type AssignedTaskListItem = {
 
 type TasksSortKey = 'title' | 'priority' | 'deadline'
 type TasksSortDirection = 'asc' | 'desc'
+type TaskStatusTab = 'EN_COURS' | 'REUSSIE' | 'ECHOUEE'
 
 function getPriorityCursorPercent(priorityId: number | null) {
   switch (priorityId) {
@@ -194,6 +195,7 @@ export default function TachesPage() {
   const [tasksSearchTerm, setTasksSearchTerm] = useState('')
   const [tasksSortKey, setTasksSortKey] = useState<TasksSortKey>('title')
   const [tasksSortDirection, setTasksSortDirection] = useState<TasksSortDirection>('asc')
+  const [taskStatusTab, setTaskStatusTab] = useState<TaskStatusTab>('EN_COURS')
   const [tasksNowMs, setTasksNowMs] = useState(() => Date.now())
   const [taskCollaboratorsByTaskId, setTaskCollaboratorsByTaskId] = useState<Map<number, string[]>>(new Map())
 
@@ -281,7 +283,7 @@ export default function TachesPage() {
 
       if (linkError || !linkRows) {
         setAssignedTasks([])
-        setAssignedTasksError("Impossible de charger les tâches.")
+        setAssignedTasksError("Impossible de charger les tÃ¢ches.")
         setAssignedTasksLoading(false)
         return
       }
@@ -301,11 +303,25 @@ export default function TachesPage() {
         return
       }
 
+      const { data: statusRow, error: statusError } = await supabase
+        .from('statut_tache')
+        .select('id_statut_tache')
+        .eq('code_statut_tache', taskStatusTab)
+        .single()
+
+      if (statusError || !statusRow) {
+        setAssignedTasks([])
+        setAssignedTasksError(`Le statut ${taskStatusTab} est introuvable.`)
+        setTaskCollaboratorsByTaskId(new Map())
+        setAssignedTasksLoading(false)
+        return
+      }
+
       const { data: taskRows, error: taskError } = await supabase
         .from('tache')
         .select('*')
         .in('id_tache', taskIds)
-        .eq('actif', true)
+        .eq('id_statut_tache', statusRow.id_statut_tache)
         .neq('tache_systeme', true)
         .order('titre_tache', { ascending: true })
 
@@ -313,7 +329,7 @@ export default function TachesPage() {
 
       if (taskError || !taskRows) {
         setAssignedTasks([])
-        setAssignedTasksError("Impossible de charger les tâches.")
+        setAssignedTasksError("Impossible de charger les tÃ¢ches.")
         setTaskCollaboratorsByTaskId(new Map())
         setAssignedTasksLoading(false)
         return
@@ -333,7 +349,7 @@ export default function TachesPage() {
             typeof task.titre_tache === 'string'
               ? task.titre_tache.trim().toLocaleLowerCase('fr-FR')
               : ''
-          return title !== 'autre tâche' && title !== 'autre tache'
+          return title !== 'autre tÃ¢che' && title !== 'autre tache'
         })
         .map((task) => {
           const dynamicTask = task as Record<string, unknown>
@@ -342,7 +358,7 @@ export default function TachesPage() {
             title:
               typeof task.titre_tache === 'string' && task.titre_tache.trim()
                 ? task.titre_tache
-                : 'Tâche',
+                : 'TÃ¢che',
             description:
               typeof dynamicTask.description_tache === 'string' && dynamicTask.description_tache.trim()
                 ? dynamicTask.description_tache
@@ -407,7 +423,7 @@ export default function TachesPage() {
     return () => {
       cancelled = true
     }
-  }, [connectedUserId])
+  }, [connectedUserId, taskStatusTab])
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -561,10 +577,29 @@ export default function TachesPage() {
           <button
             type="button"
             role="tab"
-            aria-selected
-            className={`${styles.tabButton} ${styles.tabButtonActive}`}
+            aria-selected={taskStatusTab === 'EN_COURS'}
+            className={`${styles.tabButton} ${taskStatusTab === 'EN_COURS' ? styles.tabButtonActive : ''}`}
+            onClick={() => setTaskStatusTab('EN_COURS')}
           >
-            Voir mes tâches
+            Tâches en cours
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={taskStatusTab === 'REUSSIE'}
+            className={`${styles.tabButton} ${taskStatusTab === 'REUSSIE' ? styles.tabButtonActive : ''}`}
+            onClick={() => setTaskStatusTab('REUSSIE')}
+          >
+            Tâches réussies
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={taskStatusTab === 'ECHOUEE'}
+            className={`${styles.tabButton} ${taskStatusTab === 'ECHOUEE' ? styles.tabButtonActive : ''}`}
+            onClick={() => setTaskStatusTab('ECHOUEE')}
+          >
+            Tâches échouées
           </button>
         </div>
       }
@@ -574,16 +609,16 @@ export default function TachesPage() {
           <input
             type="search"
             className={styles.tasksSearchInput}
-            placeholder="Rechercher une tâche..."
+            placeholder="Rechercher une tÃ¢che..."
             value={tasksSearchTerm}
             onChange={(event) => setTasksSearchTerm(event.target.value)}
-            aria-label="Rechercher une tâche par titre"
+            aria-label="Rechercher une tÃ¢che par titre"
           />
         </div>
         <div className={styles.tasksBody}>
           {assignedTasksLoading ? (
             <div className={styles.tasksEmptyState}>
-              <p className={styles.tasksStateText}>Chargement des tâches...</p>
+              <p className={styles.tasksStateText}>Chargement des tÃ¢ches...</p>
             </div>
           ) : assignedTasksError ? (
             <div className={styles.tasksEmptyState}>
@@ -591,7 +626,13 @@ export default function TachesPage() {
             </div>
           ) : sortedAssignedTasks.length === 0 ? (
             <div className={styles.tasksEmptyState}>
-              <p className={styles.tasksStateText}>Aucune tâche affectée</p>
+              <p className={styles.tasksStateText}>
+                {taskStatusTab === 'REUSSIE'
+                  ? 'Aucune tâche réussie'
+                  : taskStatusTab === 'ECHOUEE'
+                    ? 'Aucune tâche échouée'
+                    : 'Aucune tâche affectée'}
+              </p>
             </div>
           ) : (
             <table className={styles.tasksTable}>
@@ -603,8 +644,8 @@ export default function TachesPage() {
                       className={styles.tasksSortButton}
                       onClick={() => handleTasksSort('title')}
                     >
-                      TÂCHE
-                      {tasksSortKey === 'title' ? (tasksSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                      TÃ‚CHE
+                      {tasksSortKey === 'title' ? (tasksSortDirection === 'asc' ? ' â–²' : ' â–¼') : ''}
                     </button>
                   </th>
                   <th>DESCRIPTION</th>
@@ -614,8 +655,8 @@ export default function TachesPage() {
                       className={styles.tasksSortButton}
                       onClick={() => handleTasksSort('priority')}
                     >
-                      PRIORITÉ
-                      {tasksSortKey === 'priority' ? (tasksSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                      PRIORITÃ‰
+                      {tasksSortKey === 'priority' ? (tasksSortDirection === 'asc' ? ' â–²' : ' â–¼') : ''}
                     </button>
                   </th>
                   <th>
@@ -624,11 +665,11 @@ export default function TachesPage() {
                       className={styles.tasksSortButton}
                       onClick={() => handleTasksSort('deadline')}
                     >
-                      DÉLAI
-                      {tasksSortKey === 'deadline' ? (tasksSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}
+                      DÃ‰LAI
+                      {tasksSortKey === 'deadline' ? (tasksSortDirection === 'asc' ? ' â–²' : ' â–¼') : ''}
                     </button>
                   </th>
-                  <th>ÉQUIPE</th>
+                  <th>Ã‰QUIPE</th>
                 </tr>
               </thead>
               <tbody>
@@ -657,7 +698,9 @@ export default function TachesPage() {
                     >
                       {(() => {
                         const duration = taskRemainingInfoById.get(task.id)
-                        if (!duration?.hasDueAt) return '--'
+                        if (!duration?.hasDueAt) {
+                          return <span className={styles.taskDurationNoDeadline}>--</span>
+                        }
                         const rawLabel = `${duration.days}J ${String(duration.hours).padStart(2, '0')}H ${String(
                           duration.minutes
                         ).padStart(2, '0')}MIN ${String(duration.seconds).padStart(2, '0')}SEC`
@@ -668,27 +711,30 @@ export default function TachesPage() {
                             className={styles.taskDurationScroll}
                           >
                             <span className={styles.taskDurationValue}>{duration.days}</span>
-                            <sup className={styles.taskDurationUnit}>J</sup>{' '}
+                            <span className={styles.taskDurationUnit}>J</span>
+                            <span className={styles.taskDurationSep}> - </span>
                             <span className={styles.taskDurationValue}>
                               {String(duration.hours).padStart(2, '0')}
                             </span>
-                            <sup className={styles.taskDurationUnit}>H</sup>{' '}
+                            <span className={styles.taskDurationUnit}>H</span>
+                            <span className={styles.taskDurationSep}> - </span>
                             <span className={styles.taskDurationValue}>
                               {String(duration.minutes).padStart(2, '0')}
                             </span>
-                            <sup className={styles.taskDurationUnit}>MIN</sup>{' '}
+                            <span className={styles.taskDurationUnit}>MIN</span>
+                            <span className={styles.taskDurationSep}> - </span>
                             <span className={styles.taskDurationValue}>
                               {String(duration.seconds).padStart(2, '0')}
                             </span>
-                            <sup className={styles.taskDurationUnit}>SEC</sup>
+                            <span className={styles.taskDurationUnit}>SEC</span>
                           </HoverScrollContent>
                         )
                       })()}
                     </td>
                     <td>
                       <div className={styles.taskUsersDetails}>
-                        <span className={styles.taskUsersTrigger} title="Voir les utilisateurs assignés">
-                          👤
+                        <span className={styles.taskUsersTrigger} title="Voir les utilisateurs assignÃ©s">
+                          ðŸ‘¤
                         </span>
                         <div className={styles.taskUsersMenu}>
                           {(() => {

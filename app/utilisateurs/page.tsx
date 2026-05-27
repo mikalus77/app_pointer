@@ -96,6 +96,7 @@ type AssignedTaskListItem = {
 
 type TasksSortKey = 'title' | 'priority' | 'deadline'
 type TasksSortDirection = 'asc' | 'desc'
+type TaskStatusTab = 'EN_COURS' | 'REUSSIE' | 'ECHOUEE'
 
 function padTimeUnit(value: number) {
   return String(value).padStart(2, '0')
@@ -506,6 +507,7 @@ export default function UtilisateursPage() {
   const [tasksSearchTerm, setTasksSearchTerm] = useState('')
   const [tasksSortKey, setTasksSortKey] = useState<TasksSortKey>('title')
   const [tasksSortDirection, setTasksSortDirection] = useState<TasksSortDirection>('asc')
+  const [usersTasksStatusTab, setUsersTasksStatusTab] = useState<TaskStatusTab>('EN_COURS')
   const [tasksNowMs, setTasksNowMs] = useState(() => Date.now())
   const [taskCollaboratorsByTaskId, setTaskCollaboratorsByTaskId] = useState<Map<number, string[]>>(new Map())
 
@@ -906,13 +908,26 @@ export default function UtilisateursPage() {
       }
 
       const taskIds = assignedTasksData.map((taskLink) => taskLink.id_tache)
+      const { data: statusRow, error: statusError } = await supabase
+        .from('statut_tache')
+        .select('id_statut_tache')
+        .eq('code_statut_tache', usersTasksStatusTab)
+        .single()
+
+      if (statusError || !statusRow) {
+        setAssignedTasks([])
+        setAssignedTasksError(`Le statut ${usersTasksStatusTab} est introuvable.`)
+        setTaskCollaboratorsByTaskId(new Map())
+        setAssignedTasksLoading(false)
+        return
+      }
       const { data: tasksData, error: tasksError } = await supabase
         .from('tache')
         .select(
-          'id_tache, titre_tache, description_tache, id_priorite_tache, actif, tache_systeme'
+          'id_tache, titre_tache, description_tache, id_priorite_tache, tache_systeme'
         )
         .in('id_tache', taskIds)
-        .eq('actif', true)
+        .eq('id_statut_tache', statusRow.id_statut_tache)
 
       if (cancelled) return
       if (tasksError || !tasksData) {
@@ -1002,7 +1017,7 @@ export default function UtilisateursPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedUserId])
+  }, [selectedUserId, usersTasksStatusTab])
 
   useEffect(() => {
     const tick = window.setInterval(() => {
@@ -1797,6 +1812,45 @@ export default function UtilisateursPage() {
           </div>
         ) : selectedUserTab === 'taches' ? (
           <div className={styles.tasksWrap}>
+            <div className={styles.tasksStatusTopRow}>
+              <div className={styles.tasksStatusSwitch} role="tablist" aria-label="Statut des tâches">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={usersTasksStatusTab === 'EN_COURS'}
+                  className={`${styles.pointagesViewButton} ${
+                    usersTasksStatusTab === 'EN_COURS' ? styles.pointagesViewButtonActive : ''
+                  }`}
+                  onClick={() => setUsersTasksStatusTab('EN_COURS')}
+                >
+                  Tâches en cours
+                </button>
+                <span className={styles.tasksStatusDivider} aria-hidden="true" />
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={usersTasksStatusTab === 'REUSSIE'}
+                  className={`${styles.pointagesViewButton} ${
+                    usersTasksStatusTab === 'REUSSIE' ? styles.pointagesViewButtonActive : ''
+                  }`}
+                  onClick={() => setUsersTasksStatusTab('REUSSIE')}
+                >
+                  Tâches réussies
+                </button>
+                <span className={styles.tasksStatusDivider} aria-hidden="true" />
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={usersTasksStatusTab === 'ECHOUEE'}
+                  className={`${styles.pointagesViewButton} ${
+                    usersTasksStatusTab === 'ECHOUEE' ? styles.pointagesViewButtonActive : ''
+                  }`}
+                  onClick={() => setUsersTasksStatusTab('ECHOUEE')}
+                >
+                  Tâches échouées
+                </button>
+              </div>
+            </div>
             <div className={styles.tasksToolbar}>
               <input
                 type="search"
@@ -1817,7 +1871,13 @@ export default function UtilisateursPage() {
                 </div>
               ) : sortedAssignedTasks.length === 0 ? (
                 <div className={styles.tasksEmptyState}>
-                  <p className={styles.tasksStateText}>Aucune tâche affectée</p>
+                  <p className={styles.tasksStateText}>
+                    {usersTasksStatusTab === 'REUSSIE'
+                      ? 'Aucune tâche réussie'
+                      : usersTasksStatusTab === 'ECHOUEE'
+                        ? 'Aucune tâche échouée'
+                        : 'Aucune tâche affectée'}
+                  </p>
                 </div>
               ) : (
                 <table className={styles.tasksTable}>
@@ -1883,7 +1943,9 @@ export default function UtilisateursPage() {
                         >
                           {(() => {
                             const duration = taskDeadlineById.get(task.id)
-                            if (!duration?.hasDueAt) return '-'
+                            if (!duration?.hasDueAt) {
+                              return <span className={styles.taskDurationNoDeadline}>--</span>
+                            }
                             const rawLabel = `${duration.days}J ${String(duration.hours).padStart(2, '0')}H ${String(
                               duration.minutes
                             ).padStart(2, '0')}MIN ${String(duration.seconds).padStart(2, '0')}SEC`
@@ -1894,19 +1956,22 @@ export default function UtilisateursPage() {
                                 className={styles.taskDurationScroll}
                               >
                                 <span className={styles.taskDurationValue}>{duration.days}</span>
-                                <sup className={styles.taskDurationUnit}>J</sup>{' '}
+                                <span className={styles.taskDurationUnit}>J</span>
+                                <span className={styles.taskDurationSep}> - </span>
                                 <span className={styles.taskDurationValue}>
                                   {String(duration.hours).padStart(2, '0')}
                                 </span>
-                                <sup className={styles.taskDurationUnit}>H</sup>{' '}
+                                <span className={styles.taskDurationUnit}>H</span>
+                                <span className={styles.taskDurationSep}> - </span>
                                 <span className={styles.taskDurationValue}>
                                   {String(duration.minutes).padStart(2, '0')}
                                 </span>
-                                <sup className={styles.taskDurationUnit}>MIN</sup>{' '}
+                                <span className={styles.taskDurationUnit}>MIN</span>
+                                <span className={styles.taskDurationSep}> - </span>
                                 <span className={styles.taskDurationValue}>
                                   {String(duration.seconds).padStart(2, '0')}
                                 </span>
-                                <sup className={styles.taskDurationUnit}>SEC</sup>
+                                <span className={styles.taskDurationUnit}>SEC</span>
                               </HoverScrollContent>
                             )
                           })()}
@@ -1973,7 +2038,7 @@ export default function UtilisateursPage() {
                   if (todayLiveSummary.tasks.length === 0) {
                     return (
                       <div className={styles.tasksEmptyState}>
-                        <p className={styles.tasksStateText}>Aucune donnée de pointage aujourd&apos;hui</p>
+                        <p className={styles.tasksStateText}>Aucun pointage réalisé aujourd&apos;hui</p>
                       </div>
                     )
                   }

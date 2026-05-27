@@ -1104,6 +1104,20 @@ export default function AccueilPage() {
       }
 
       const taskIds = assignedTasksData.map((taskLink) => taskLink.id_tache)
+      const { data: enCoursStatusRow, error: enCoursStatusError } = await supabase
+        .from('statut_tache')
+        .select('id_statut_tache')
+        .eq('code_statut_tache', 'EN_COURS')
+        .single()
+
+      if (enCoursStatusError || !enCoursStatusRow) {
+        setOtherTaskOptionId(null)
+        setTaskOptions([])
+        setTaskChoice('')
+        setTaskLoadError('Le statut EN_COURS est introuvable.')
+        setTaskLoading(false)
+        return
+      }
 
       if (taskIds.length === 0) {
         setOtherTaskOptionId(null)
@@ -1118,7 +1132,7 @@ export default function AccueilPage() {
         .from('tache')
         .select('id_tache, titre_tache, tache_systeme')
         .in('id_tache', taskIds)
-        .eq('actif', true)
+        .eq('id_statut_tache', enCoursStatusRow.id_statut_tache)
         .order('titre_tache', { ascending: true })
 
       if (tasksError || !tasksData) {

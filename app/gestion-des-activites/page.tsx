@@ -24,6 +24,7 @@ import styles from './page.module.css'
 
 type TasksSortKey = 'title' | 'priority'
 type TasksSortDirection = 'asc' | 'desc'
+type TaskStatusTab = 'EN_COURS' | 'REUSSIE' | 'ECHOUEE'
 type TaskFormMode = 'add' | 'edit' | null
 type AssignmentMode = 'add' | 'edit' | null
 
@@ -35,7 +36,6 @@ type TaskListItem = {
   creatorId: number | null
   creatorName: string
   createdAt: string | null
-  isActive: boolean
 }
 
 type PriorityOption = {
@@ -144,6 +144,7 @@ export default function GestionActivitesPage() {
   const [tasksSearchTerm, setTasksSearchTerm] = useState('')
   const [tasksSortKey, setTasksSortKey] = useState<TasksSortKey>('title')
   const [tasksSortDirection, setTasksSortDirection] = useState<TasksSortDirection>('asc')
+  const [taskStatusTab, setTaskStatusTab] = useState<TaskStatusTab>('EN_COURS')
   const [taskCollaboratorsByTaskId, setTaskCollaboratorsByTaskId] = useState<Map<number, string[]>>(new Map())
 
   const [deleteTaskTarget, setDeleteTaskTarget] = useState<TaskListItem | null>(null)
@@ -154,7 +155,6 @@ export default function GestionActivitesPage() {
   const [taskFormTitle, setTaskFormTitle] = useState('')
   const [taskFormDescription, setTaskFormDescription] = useState('')
   const [taskFormPriorityId, setTaskFormPriorityId] = useState<number | ''>('')
-  const [taskFormStatus, setTaskFormStatus] = useState<'active' | 'inactive'>('active')
   const [priorityOptions, setPriorityOptions] = useState<PriorityOption[]>([])
   const [taskFormPending, setTaskFormPending] = useState(false)
   const [taskFormError, setTaskFormError] = useState('')
@@ -209,10 +209,24 @@ export default function GestionActivitesPage() {
   const loadTasks = useCallback(async () => {
     setAllTasksLoading(true)
     setAllTasksError('')
+    const { data: statusRow, error: statusError } = await supabase
+      .from('statut_tache')
+      .select('id_statut_tache')
+      .eq('code_statut_tache', taskStatusTab)
+      .single()
+
+    if (statusError || !statusRow) {
+      setAllTasks([])
+      setTaskCollaboratorsByTaskId(new Map())
+      setAllTasksError(`Le statut ${taskStatusTab} est introuvable !`)
+      setAllTasksLoading(false)
+      return
+    }
 
     const { data: tasksData, error: tasksError } = await supabase
       .from('tache')
       .select('*')
+      .eq('id_statut_tache', statusRow.id_statut_tache)
       .neq('tache_systeme', true)
       .order('titre_tache', { ascending: true })
 
@@ -248,7 +262,6 @@ export default function GestionActivitesPage() {
         creatorName: '-',
         createdAt:
           typeof rawCreatedAt === 'string' && rawCreatedAt.trim() ? rawCreatedAt : null,
-        isActive: dynamicTask.actif !== false,
       }
     })
 
@@ -334,7 +347,7 @@ export default function GestionActivitesPage() {
     setAllTasks(normalizedTasks)
     setTaskCollaboratorsByTaskId(collaboratorsByTaskId)
     setAllTasksLoading(false)
-  }, [])
+  }, [taskStatusTab])
 
   useEffect(() => {
     void loadTasks()
@@ -457,7 +470,6 @@ export default function GestionActivitesPage() {
     setTaskFormTitle('')
     setTaskFormDescription('')
     setTaskFormPriorityId('')
-    setTaskFormStatus('active')
     setTaskFormPending(false)
     setTaskFormError('')
   }, [])
@@ -468,7 +480,6 @@ export default function GestionActivitesPage() {
     setTaskFormTitle('')
     setTaskFormDescription('')
     setTaskFormPriorityId(priorityOptions[0]?.id ?? '')
-    setTaskFormStatus('active')
     setTaskFormPending(false)
     setTaskFormError('')
   }, [priorityOptions])
@@ -479,7 +490,6 @@ export default function GestionActivitesPage() {
     setTaskFormTitle(task.title)
     setTaskFormDescription(task.description === '-' ? '' : task.description)
     setTaskFormPriorityId(task.priorityId ?? '')
-    setTaskFormStatus(task.isActive ? 'active' : 'inactive')
     setTaskFormPending(false)
     setTaskFormError('')
   }, [])
@@ -504,17 +514,29 @@ export default function GestionActivitesPage() {
       titre_tache: normalizedTitle,
       description_tache: taskFormDescription.trim() || null,
       id_priorite_tache: Number(taskFormPriorityId),
-      actif: taskFormStatus === 'active',
     }
 
     if (taskFormMode === 'add') {
+      const { data: enCoursStatusRow, error: enCoursStatusError } = await supabase
+        .from('statut_tache')
+        .select('id_statut_tache')
+        .eq('code_statut_tache', 'EN_COURS')
+        .single()
+
+      if (enCoursStatusError || !enCoursStatusRow) {
+        setTaskFormPending(false)
+        setTaskFormError('Le statut EN_COURS est introuvable !')
+        return
+      }
       const creatorId =
         typeof connectedUserId === 'number' && Number.isFinite(connectedUserId)
           ? connectedUserId
           : null
 
       const createTask = async (creatorColumn: 'id_utilisateur_createur' | 'id_createur_tache') => {
-        const insertPayload = creatorId ? { ...payload, [creatorColumn]: creatorId } : payload
+        const insertPayload = creatorId
+          ? { ...payload, id_statut_tache: enCoursStatusRow.id_statut_tache, [creatorColumn]: creatorId }
+          : { ...payload, id_statut_tache: enCoursStatusRow.id_statut_tache }
         return supabase.from('tache').insert(insertPayload).select('id_tache').single()
       }
 
@@ -580,7 +602,6 @@ export default function GestionActivitesPage() {
     taskFormMode,
     taskFormPending,
     taskFormPriorityId,
-    taskFormStatus,
     taskFormTarget,
     taskFormTitle,
     connectedUserId,
@@ -882,10 +903,29 @@ export default function GestionActivitesPage() {
             <button
               type="button"
               role="tab"
-              aria-selected
-              className={`${styles.tabButton} ${styles.tabButtonActive}`}
+              aria-selected={taskStatusTab === 'EN_COURS'}
+              className={`${styles.tabButton} ${taskStatusTab === 'EN_COURS' ? styles.tabButtonActive : ''}`}
+              onClick={() => setTaskStatusTab('EN_COURS')}
             >
-              Toutes les tâches
+              Tâches en cours
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={taskStatusTab === 'REUSSIE'}
+              className={`${styles.tabButton} ${taskStatusTab === 'REUSSIE' ? styles.tabButtonActive : ''}`}
+              onClick={() => setTaskStatusTab('REUSSIE')}
+            >
+              Tâches réussies
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={taskStatusTab === 'ECHOUEE'}
+              className={`${styles.tabButton} ${taskStatusTab === 'ECHOUEE' ? styles.tabButtonActive : ''}`}
+              onClick={() => setTaskStatusTab('ECHOUEE')}
+            >
+              Tâches échouées
             </button>
           </div>
         }
@@ -900,9 +940,11 @@ export default function GestionActivitesPage() {
               onChange={(event) => setTasksSearchTerm(event.target.value)}
               aria-label="Rechercher une tâche par titre"
             />
-            <button type="button" className={styles.addTaskButton} onClick={openAddTaskModal}>
-              ajouter une tâche
-            </button>
+            {taskStatusTab === 'EN_COURS' ? (
+              <button type="button" className={styles.addTaskButton} onClick={openAddTaskModal}>
+                ajouter une tâche
+              </button>
+            ) : null}
           </div>
           <div className={styles.tasksBody}>
             {allTasksLoading ? (
@@ -915,10 +957,18 @@ export default function GestionActivitesPage() {
               </div>
             ) : sortedTasks.length === 0 ? (
               <div className={styles.tasksEmptyState}>
-                <p className={styles.tasksStateText}>Aucune tâche affectée</p>
+                <p className={styles.tasksStateText}>
+                  {taskStatusTab === 'REUSSIE'
+                    ? 'Aucune tâche réussie'
+                    : taskStatusTab === 'ECHOUEE'
+                      ? 'Aucune tâche échouée'
+                      : 'Aucune tâche affectée'}
+                </p>
               </div>
             ) : (
-              <table className={styles.tasksTable}>
+              <table
+                className={`${styles.tasksTable} ${taskStatusTab === 'EN_COURS' ? styles.tasksTableSharp : ''}`}
+              >
                 <thead>
                   <tr>
                     <th scope="col">
@@ -949,11 +999,7 @@ export default function GestionActivitesPage() {
                 <tbody>
                   {sortedTasks.map((task) => (
                     <tr key={task.id}>
-                      <td
-                        className={
-                          task.isActive ? styles.taskTitleStatusActive : styles.taskTitleStatusInactive
-                        }
-                      >
+                      <td>
                         <HoverScrollText text={task.title} className={styles.taskTitleCell} />
                       </td>
                       <td>
@@ -1009,15 +1055,6 @@ export default function GestionActivitesPage() {
                               <p className={styles.taskInfoLine}>
                                 <span className={styles.taskInfoLabel}>Créée à :</span>{' '}
                                 <span className={styles.taskInfoValue}>{formatTaskCreatedAt(task.createdAt).split(' - ')[1] ?? '-'}</span>
-                              </p>
-                              <p className={styles.taskInfoLine}>
-                                <span
-                                  className={`${styles.taskStatusDot} ${
-                                    task.isActive ? styles.taskStatusDotActive : styles.taskStatusDotInactive
-                                  }`}
-                                  aria-hidden="true"
-                                />
-                                <span className={styles.taskInfoValue}>{task.isActive ? 'active' : 'inactive'}</span>
                               </p>
                             </div>
                           </div>
@@ -1147,23 +1184,6 @@ export default function GestionActivitesPage() {
                     ))}
                   </select>
                 </div>
-
-                <div className={styles.taskFormField}>
-                  <label htmlFor="task-form-status" className={styles.taskFormLabel}>
-                    Statut
-                  </label>
-                  <select
-                    id="task-form-status"
-                    className={styles.taskFormSelect}
-                    value={taskFormStatus}
-                    onChange={(event) =>
-                      setTaskFormStatus(event.target.value === 'inactive' ? 'inactive' : 'active')
-                    }
-                  >
-                    <option value="active">actif</option>
-                    <option value="inactive">inactif</option>
-                  </select>
-                </div>
               </div>
 
               {taskFormError ? <p className={styles.deleteError}>{taskFormError}</p> : null}
@@ -1230,7 +1250,7 @@ export default function GestionActivitesPage() {
                 {assignmentLoading ? (
                   <p className={styles.tasksStateText}>Chargement des utilisateurs...</p>
                 ) : filteredAssignmentUsers.length === 0 ? (
-                  <p className={styles.tasksStateText}>Aucun utilisateur actif</p>
+                  <p className={styles.tasksStateText}>Aucun utilisateur</p>
                 ) : (
                   filteredAssignmentUsers.map((user) => (
                     <div key={user.id} className={styles.assignmentRow}>
