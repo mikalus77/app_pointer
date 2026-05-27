@@ -308,6 +308,25 @@ function splitCommentLines(comment: string) {
     .filter((line) => line.length > 0)
 }
 
+function isSystemAutoStopComment(comment: string) {
+  const normalizedComment = comment.trim().toLowerCase()
+  return (
+    normalizedComment.startsWith('session arrêtée automatiquement après') ||
+    normalizedComment.startsWith('session arretee automatiquement apres') ||
+    normalizedComment.startsWith('pause arrêtée automatiquement après') ||
+    normalizedComment.startsWith('pause arretee automatiquement apres') ||
+    normalizedComment.startsWith('session arrêtée pour inactivité') ||
+    normalizedComment.startsWith('session arretee pour inactivite') ||
+    normalizedComment.startsWith("arrêt à cause de") ||
+    normalizedComment.startsWith('arret a cause de')
+  )
+}
+
+function sanitizeUserComment(comment: string | null | undefined) {
+  if (!comment) return null
+  return isSystemAutoStopComment(comment) ? null : comment
+}
+
 function getNonManualStopReasonLabel(
   code: string | null | undefined,
   label: string | null | undefined
@@ -1285,7 +1304,7 @@ export default function AccueilPage() {
             startIso: session.debut_session_pointage,
             endIso: session.fin_session_pointage,
             durationMs,
-            comment: session.commentaire_session_pointage,
+            comment: sanitizeUserComment(session.commentaire_session_pointage),
           })
           entry.totalDurationMs += durationMs
         }
@@ -1342,7 +1361,7 @@ export default function AccueilPage() {
             startIso: pause.debut_pause_pointage,
             endIso: pause.fin_pause_pointage,
             durationMs,
-            comment: pause.commentaire_pause_pointage,
+            comment: sanitizeUserComment(pause.commentaire_pause_pointage),
           })
           entry.totalDurationMs += durationMs
         }
@@ -1480,7 +1499,7 @@ export default function AccueilPage() {
             startIso: session.debut_session_pointage,
             endIso: session.fin_session_pointage,
             durationMs,
-            comment: session.commentaire_session_pointage,
+            comment: sanitizeUserComment(session.commentaire_session_pointage),
           })
           entry.totalDurationMs += durationMs
         } else {
@@ -1548,7 +1567,7 @@ export default function AccueilPage() {
             startIso: pause.debut_pause_pointage,
             endIso: pause.fin_pause_pointage,
             durationMs,
-            comment: pause.commentaire_pause_pointage,
+            comment: sanitizeUserComment(pause.commentaire_pause_pointage),
           })
           entry.totalDurationMs += durationMs
         } else {
@@ -1652,7 +1671,7 @@ export default function AccueilPage() {
       setPointageComment(
         isSameActiveSession
           ? pointageCommentRef.current
-          : activeSession.commentaire_session_pointage ??
+          : sanitizeUserComment(activeSession.commentaire_session_pointage) ??
               (activeWorkEntry ? getLatestWorkComment(activeWorkEntry) : '')
       )
 
@@ -1660,7 +1679,7 @@ export default function AccueilPage() {
         setCurrentPausePointageId(activePause.id_pause_pointage)
         setCurrentPauseStartedAtIso(activePause.debut_pause_pointage)
         setPauseElapsedMs(activePauseElapsedMs)
-        setPauseComment(activePause.commentaire_pause_pointage ?? '')
+        setPauseComment(sanitizeUserComment(activePause.commentaire_pause_pointage) ?? '')
         setPointageMode('paused')
       } else {
         setCurrentPausePointageId(null)
@@ -1839,7 +1858,7 @@ export default function AccueilPage() {
           session.debut_session_pointage,
           session.fin_session_pointage
         )
-        const latestComment = session.commentaire_session_pointage || '-'
+        const latestComment = sanitizeUserComment(session.commentaire_session_pointage) || '-'
         const existingSummary = taskMap.get(taskKey)
 
         const existingComment = existingSummary?.comment ?? '-'
@@ -2306,7 +2325,7 @@ export default function AccueilPage() {
             session.debut_session_pointage,
             session.fin_session_pointage as string
           ),
-          comment: session.commentaire_session_pointage,
+          comment: sanitizeUserComment(session.commentaire_session_pointage),
         }
       })
 

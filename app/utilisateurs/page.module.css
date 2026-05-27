@@ -45,10 +45,58 @@
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  padding-top: 14px;
+  justify-content: flex-start;
+  gap: 36px;
+  padding-top: 10px;
   box-sizing: border-box;
+}
+
+.profileHeaderRow {
+  width: min(980px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profileStatusActionBtn {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+
+.profileStatusActionBtn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.profileStatusActionBtnSuccess {
+  background-color: #e8f6ec;
+  border-color: #8bc89d;
+  color: #176e2f;
+}
+
+.profileStatusActionBtnDanger {
+  background-color: #fdecec;
+  border-color: #e3a2a2;
+  color: #b42323;
+}
+
+.profileCreatedAtText {
+  margin: 0;
+  color: #4a6383;
+  font-family: "Poppins", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
 }
 
 .profileGrid {
@@ -62,6 +110,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: auto;
 }
 
 .profileLabel {
@@ -72,6 +121,7 @@
 }
 
 .profileInput {
+  width: min(100%, 345px);
   height: 40px;
   border: 1px solid #c7d7ea;
   border-radius: 9px;
@@ -84,12 +134,118 @@
   box-sizing: border-box;
 }
 
+.pointageRangeRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pointageRangeSelect {
+  height: 28px;
+  min-width: 56px;
+  border: 1px solid #c7d7ea;
+  border-radius: 7px;
+  background-color: #ffffff;
+  color: #2f4f76;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 6px;
+}
+
+.pointageRangeSep,
+.pointageRangeDash {
+  color: #365a83;
+  font-family: "Poppins", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pointageRangeSep {
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+.pointageRangeDash {
+  margin-left: 19px;
+  margin-right: 19px;
+}
+
+.todayPointageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: -22px;
+}
+
+.todayPointageStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todayPointageStatusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.todayPointageStatusDotRunning {
+  background-color: #22a745;
+}
+
+.todayPointageStatusDotFinished {
+  background-color: #cf2e2e;
+}
+
+.todayPointageStatusText {
+  color: #244b79;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.todayPointageDate {
+  margin: 0;
+  color: #244b79;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.todaySessionRunning {
+  color: #1d8f3d;
+  font-weight: 700;
+}
+
+.todaySessionStopReason {
+  color: #cf2e2e;
+  font-weight: 700;
+}
+
 .pointagesWrap {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 19px;
   height: 100%;
-  margin-top: -23px;
+  margin-top: -8px;
+}
+
+.pointagesTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pointagesTodayDate {
+  margin: 0;
+  color: #244b79;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .pointagesViewsSwitch {

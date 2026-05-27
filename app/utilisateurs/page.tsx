@@ -26,6 +26,9 @@ import {
 import { supabase } from '../../lib/supabase'
 import styles from './page.module.css'
 
+const LOCAL_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$/
+
 type DayTaskSummary = {
   taskKey: string
   taskId: string
@@ -50,6 +53,19 @@ type TaskSessionsOverlayState = {
   taskTitle: string
   sessions: Array<{ startLabel: string; endLabel: string }>
 }
+type TodayLiveSession = {
+  startIso: string
+  endIso: string | null
+  comment: string | null
+  stopReasonCode: string | null
+  stopReasonLabel: string | null
+}
+type TodayLiveTask = {
+  taskKey: string
+  taskId: string
+  taskTitle: string
+  sessions: TodayLiveSession[]
+}
 
 type SelectedUserProfile = {
   prenom: string
@@ -58,6 +74,16 @@ type SelectedUserProfile = {
   email: string
   telephone: string
   adresse: string
+  pointageStartHour: string
+  pointageStartMinute: string
+  pointageEndHour: string
+  pointageEndMinute: string
+  statusCode: 'EN_ATTENTE' | 'ACTIVE' | 'DESACTIVE' | null
+  createdAtLabel: string
+}
+type PointageRangeStorage = {
+  startKey: string | null
+  endKey: string | null
 }
 
 type AssignedTaskListItem = {
@@ -126,14 +152,52 @@ function formatDurationParts(durationMs: number) {
 }
 
 function formatTimeLabel(isoString: string) {
-  return new Date(isoString).toLocaleTimeString('fr-FR', {
+  return parseStoredTimestamp(isoString).toLocaleTimeString('fr-FR', {
     hour: '2-digit',
     minute: '2-digit',
   })
 }
 
 function getDurationMsBetween(startTimestamp: string, endTimestamp: string) {
-  return Math.max(new Date(endTimestamp).getTime() - new Date(startTimestamp).getTime(), 0)
+  return Math.max(
+    parseStoredTimestamp(endTimestamp).getTime() - parseStoredTimestamp(startTimestamp).getTime(),
+    0
+  )
+}
+
+function parseStoredTimestamp(timestamp: string) {
+  const normalizedTimestamp = timestamp.trim()
+  const postgresTimestampWithTimezone = normalizedTimestamp.match(
+    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?)([zZ]|[+-]\d{2}(?::?\d{2})?)$/
+  )
+  if (postgresTimestampWithTimezone) {
+    const [, datePart, timePart, offsetPart] = postgresTimestampWithTimezone
+    const normalizedOffset =
+      /[zZ]/.test(offsetPart)
+        ? 'Z'
+        : offsetPart.includes(':')
+          ? offsetPart
+          : `${offsetPart.slice(0, 3)}:${offsetPart.slice(3).padEnd(2, '0')}`
+    return new Date(`${datePart}T${timePart}${normalizedOffset}`)
+  }
+
+  const match = normalizedTimestamp.match(LOCAL_TIMESTAMP_PATTERN)
+  if (!match) {
+    return new Date(normalizedTimestamp)
+  }
+
+  const [, year, month, day, hours, minutes, seconds = '0', fraction = '0'] = match
+  return new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hours),
+      Number(minutes),
+      Number(seconds),
+      Number((fraction + '000').slice(0, 3))
+    )
+  )
 }
 
 function splitCommentLines(comment: string) {
@@ -143,6 +207,25 @@ function splitCommentLines(comment: string) {
     .filter((line) => line.length > 0)
 }
 
+function isSystemAutoStopComment(comment: string) {
+  const normalizedComment = comment.trim().toLowerCase()
+  return (
+    normalizedComment.startsWith('session arrêtée automatiquement après') ||
+    normalizedComment.startsWith('session arretee automatiquement apres') ||
+    normalizedComment.startsWith('pause arrêtée automatiquement après') ||
+    normalizedComment.startsWith('pause arretee automatiquement apres') ||
+    normalizedComment.startsWith('session arrêtée pour inactivité') ||
+    normalizedComment.startsWith('session arretee pour inactivite') ||
+    normalizedComment.startsWith("arrêt à cause de") ||
+    normalizedComment.startsWith('arret a cause de')
+  )
+}
+
+function sanitizeUserComment(comment: string | null | undefined) {
+  if (!comment) return null
+  return isSystemAutoStopComment(comment) ? null : comment
+}
+
 function buildTaskGroupingKey(taskId: number | string, taskTitle: string) {
   return `${String(taskId)}::${taskTitle.trim().toLocaleLowerCase('fr-FR')}`
 }
@@ -150,6 +233,72 @@ function buildTaskGroupingKey(taskId: number | string, taskTitle: string) {
 function capitalizeFirstLetter(value: string) {
   if (!value) return value
   return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+function normalizeStatusCode(value: unknown): 'EN_ATTENTE' | 'ACTIVE' | 'DESACTIVE' | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toUpperCase()
+  if (normalized === 'EN_ATTENTE' || normalized === 'ACTIVE' || normalized === 'DESACTIVE') {
+    return normalized
+  }
+  return null
+}
+
+function pickCreatedAtLabel(row: Record<string, unknown>) {
+  const candidates = [
+    row.date_creation_utilisateur,
+    row.created_at,
+    row.createdat,
+    row.date_creation,
+  ]
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const date = parseStoredTimestamp(value)
+      if (!Number.isNaN(date.getTime())) {
+        return date.toLocaleDateString('fr-FR')
+      }
+    }
+  }
+  return '--/--/----'
+}
+
+function minutesToHourRange(value: unknown) {
+  const minutes = Number(value)
+  if (!Number.isFinite(minutes) || minutes < 0) return ''
+  const hoursPart = Math.floor(minutes / 60)
+  const minutesPart = minutes % 60
+  return `${String(hoursPart).padStart(2, '0')}:${String(minutesPart).padStart(2, '0')}`
+}
+
+function splitHourRange(value: string) {
+  const normalized = value.trim()
+  const match = normalized.match(/^(\d{2}):(\d{2})$/)
+  if (!match) {
+    return { hour: '08', minute: '00' }
+  }
+  return { hour: match[1], minute: match[2] }
+}
+
+function rangeToExpectedMinutes(startHour: string, startMinute: string, endHour: string, endMinute: string) {
+  const start = Number(startHour) * 60 + Number(startMinute)
+  const end = Number(endHour) * 60 + Number(endMinute)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return null
+  }
+  return end - start
+}
+
+function pickFirstTimeValue(row: Record<string, unknown>, candidates: string[]) {
+  for (const key of candidates) {
+    const value = row[key]
+    if (typeof value !== 'string') continue
+    const trimmed = value.trim()
+    const match = trimmed.match(/^(\d{2}):(\d{2})/)
+    if (match) {
+      return { key, hour: match[1], minute: match[2] }
+    }
+  }
+  return null
 }
 
 function HoverScrollText({
@@ -336,11 +485,18 @@ export default function UtilisateursPage() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [selectedUserTab, setSelectedUserTab] = useState<'profil' | 'pointages' | 'taches'>('profil')
   const [selectedUserProfile, setSelectedUserProfile] = useState<SelectedUserProfile | null>(null)
+  const [profileStatusPending, setProfileStatusPending] = useState(false)
+  const [profileRangePending, setProfileRangePending] = useState(false)
+  const [pointageRangeStorage, setPointageRangeStorage] = useState<PointageRangeStorage>({
+    startKey: null,
+    endKey: null,
+  })
   const [usersPointagesView, setUsersPointagesView] = useState<'aujourdhui' | 'agenda'>('agenda')
   const [selectedUserExpectedDailyDurationMs, setSelectedUserExpectedDailyDurationMs] = useState<number | null>(
     null
   )
   const [agendaDaySummaries, setAgendaDaySummaries] = useState<Record<string, DaySummary>>({})
+  const [todayLiveTasks, setTodayLiveTasks] = useState<TodayLiveTask[]>([])
   const [monthDetailDate, setMonthDetailDate] = useState<Date | null>(null)
   const [pointageBoundsOverlay, setPointageBoundsOverlay] = useState<PointageBoundsOverlayState | null>(null)
   const [taskSessionsOverlay, setTaskSessionsOverlay] = useState<TaskSessionsOverlayState | null>(null)
@@ -557,9 +713,7 @@ export default function UtilisateursPage() {
     const loadSelectedUserProfile = async () => {
       const { data, error } = await supabase
         .from('utilisateur')
-        .select(
-          'prenom_utilisateur, nom_utilisateur, username_utilisateur, email_utilisateur, telephone_utilisateur, adresse_utilisateur'
-        )
+        .select('*, id_statut_utilisateur!inner(code_statut_utilisateur)')
         .eq('id_utilisateur', selectedUserId)
         .single()
 
@@ -569,13 +723,51 @@ export default function UtilisateursPage() {
         return
       }
 
+      const relationStatusCode = normalizeStatusCode(
+        (data.id_statut_utilisateur as { code_statut_utilisateur?: string } | null)
+          ?.code_statut_utilisateur
+      )
+      const directStatusCode = normalizeStatusCode(
+        (data as Record<string, unknown>).code_statut_utilisateur
+      )
+
+      const rawRow = data as Record<string, unknown>
+      const startCandidate = pickFirstTimeValue(rawRow, [
+        'heure_min_pointage',
+        'heure_debut_pointage_autorisee',
+        'heure_debut_plage_pointage',
+        'heure_debut_autorisation_pointage',
+        'debut_plage_horaire_pointage_utilisateur',
+      ])
+      const endCandidate = pickFirstTimeValue(rawRow, [
+        'heure_max_pointage',
+        'heure_fin_pointage_autorisee',
+        'heure_fin_plage_pointage',
+        'heure_fin_autorisation_pointage',
+        'fin_plage_horaire_pointage_utilisateur',
+      ])
+      const durationLabel = minutesToHourRange(data.duree_journaliere_attendue_utilisateur)
+      const fallbackStart = splitHourRange('08:00')
+      const fallbackEnd = splitHourRange(durationLabel || '16:00')
+
+      setPointageRangeStorage({
+        startKey: startCandidate?.key ?? 'heure_min_pointage',
+        endKey: endCandidate?.key ?? 'heure_max_pointage',
+      })
+
       setSelectedUserProfile({
+        pointageStartHour: startCandidate?.hour ?? fallbackStart.hour,
+        pointageStartMinute: startCandidate?.minute ?? fallbackStart.minute,
+        pointageEndHour: endCandidate?.hour ?? fallbackEnd.hour,
+        pointageEndMinute: endCandidate?.minute ?? fallbackEnd.minute,
         prenom: (data.prenom_utilisateur ?? '').trim(),
         nom: (data.nom_utilisateur ?? '').trim(),
         username: (data.username_utilisateur ?? '').trim(),
         email: (data.email_utilisateur ?? '').trim(),
         telephone: (data.telephone_utilisateur ?? '').trim(),
         adresse: (data.adresse_utilisateur ?? '').trim(),
+        statusCode: relationStatusCode ?? directStatusCode,
+        createdAtLabel: pickCreatedAtLabel(data as Record<string, unknown>),
       })
     }
 
@@ -584,6 +776,99 @@ export default function UtilisateursPage() {
       cancelled = true
     }
   }, [selectedUserId])
+
+  const updateSelectedUserStatus = async () => {
+    if (!selectedUserId || !selectedUserProfile?.statusCode || profileStatusPending) return
+
+    const targetStatusCode =
+      selectedUserProfile.statusCode === 'EN_ATTENTE'
+        ? 'ACTIVE'
+        : selectedUserProfile.statusCode === 'ACTIVE'
+          ? 'DESACTIVE'
+          : 'ACTIVE'
+
+    setProfileStatusPending(true)
+    const { data: statusRow, error: statusError } = await supabase
+      .from('statut_utilisateur')
+      .select('id_statut_utilisateur')
+      .eq('code_statut_utilisateur', targetStatusCode)
+      .eq('actif', true)
+      .single()
+
+    if (statusError || !statusRow) {
+      setProfileStatusPending(false)
+      return
+    }
+
+    const { error: updateError } = await supabase
+      .from('utilisateur')
+      .update({ id_statut_utilisateur: statusRow.id_statut_utilisateur })
+      .eq('id_utilisateur', selectedUserId)
+
+    if (!updateError) {
+      setSelectedUserProfile((previous) =>
+        previous
+          ? {
+              ...previous,
+              statusCode: targetStatusCode,
+            }
+          : previous
+      )
+      setUsersTabList((previousList) =>
+        previousList.map((user) =>
+          user.id === selectedUserId
+            ? {
+                ...user,
+                statusCode: targetStatusCode,
+                hasActiveSession: targetStatusCode === 'ACTIVE' ? user.hasActiveSession : false,
+              }
+            : user
+        )
+      )
+    }
+
+    setProfileStatusPending(false)
+  }
+
+  const saveSelectedUserPointageRange = async () => {
+    if (!selectedUserId || !selectedUserProfile || profileRangePending) return
+    const parsedMinutes = rangeToExpectedMinutes(
+      selectedUserProfile.pointageStartHour,
+      selectedUserProfile.pointageStartMinute,
+      selectedUserProfile.pointageEndHour,
+      selectedUserProfile.pointageEndMinute
+    )
+    if (parsedMinutes === null) return
+
+    setProfileRangePending(true)
+    const startValue = `${selectedUserProfile.pointageStartHour}:${selectedUserProfile.pointageStartMinute}:00`
+    const endValue = `${selectedUserProfile.pointageEndHour}:${selectedUserProfile.pointageEndMinute}:00`
+    const updatePayload: Record<string, unknown> = {
+      duree_journaliere_attendue_utilisateur: parsedMinutes,
+    }
+    if (pointageRangeStorage.startKey) {
+      updatePayload[pointageRangeStorage.startKey] = startValue
+    }
+    if (pointageRangeStorage.endKey) {
+      updatePayload[pointageRangeStorage.endKey] = endValue
+    }
+
+    const { error } = await supabase
+      .from('utilisateur')
+      .update(updatePayload)
+      .eq('id_utilisateur', selectedUserId)
+    if (!error) {
+      setSelectedUserExpectedDailyDurationMs(parsedMinutes * 60 * 1000)
+      setSelectedUserProfile((previous) =>
+        previous
+          ? {
+              ...previous,
+            }
+          : previous
+      )
+    }
+    setProfileRangePending(false)
+  }
 
   useEffect(() => {
     if (selectedUserId === null) {
@@ -728,6 +1013,104 @@ export default function UtilisateursPage() {
 
   useEffect(() => {
     if (selectedUserId === null) {
+      setTodayLiveTasks([])
+      return
+    }
+
+    let cancelled = false
+    const loadTodayLiveTasks = async () => {
+      const todayStamp = getLocalDateStamp(new Date())
+      const { data: pointageRows, error: pointageError } = await supabase
+        .from('pointage')
+        .select('id_pointage, id_tache, libelle_tache_libre_pointage')
+        .eq('id_utilisateur_pointeur', selectedUserId)
+        .eq('date_pointage', todayStamp)
+        .order('id_pointage', { ascending: true })
+
+      if (cancelled || pointageError || !pointageRows || pointageRows.length === 0) {
+        if (!cancelled) setTodayLiveTasks([])
+        return
+      }
+
+      const taskIds = Array.from(new Set(pointageRows.map((row) => Number(row.id_tache)).filter(Number.isFinite)))
+      const { data: taskRows } =
+        taskIds.length > 0
+          ? await supabase.from('tache').select('id_tache, titre_tache').in('id_tache', taskIds)
+          : { data: [] as Array<{ id_tache: number; titre_tache: string | null }> }
+      const taskTitleById = new Map<number, string>((taskRows ?? []).map((task) => [task.id_tache, task.titre_tache ?? '']))
+      const pointageMetaById = new Map<number, { taskId: number; taskTitle: string }>(
+        pointageRows.map((row) => [
+          row.id_pointage,
+          {
+            taskId: row.id_tache,
+            taskTitle: (row.libelle_tache_libre_pointage ?? '').trim() || taskTitleById.get(row.id_tache) || 'Tâche non renseignée',
+          },
+        ])
+      )
+
+      const pointageIds = pointageRows.map((row) => row.id_pointage)
+      const { data: sessionRows, error: sessionError } = await supabase
+        .from('session_pointage')
+        .select(
+          'id_pointage, debut_session_pointage, fin_session_pointage, commentaire_session_pointage, motif_arret_session:motif_arret_session!fk_session_pointage_motif_arret_session(code_motif_arret_session, libelle_motif_arret_session)'
+        )
+        .in('id_pointage', pointageIds)
+        .order('debut_session_pointage', { ascending: true })
+
+      if (cancelled || sessionError || !sessionRows) {
+        if (!cancelled) setTodayLiveTasks([])
+        return
+      }
+
+      const grouped = new Map<string, TodayLiveTask>()
+      for (const session of sessionRows) {
+        const meta = pointageMetaById.get(session.id_pointage)
+        if (!meta) continue
+        const taskKey = buildTaskGroupingKey(meta.taskId, meta.taskTitle)
+        const existing = grouped.get(taskKey)
+        if (!existing) {
+          grouped.set(taskKey, {
+            taskKey,
+            taskId: String(meta.taskId),
+            taskTitle: meta.taskTitle,
+            sessions: [
+              {
+                startIso: session.debut_session_pointage,
+                endIso: session.fin_session_pointage ?? null,
+                comment: sanitizeUserComment(session.commentaire_session_pointage),
+                stopReasonCode: session.motif_arret_session?.code_motif_arret_session ?? null,
+                stopReasonLabel: session.motif_arret_session?.libelle_motif_arret_session ?? null,
+              },
+            ],
+          })
+        } else {
+          existing.sessions.push({
+            startIso: session.debut_session_pointage,
+            endIso: session.fin_session_pointage ?? null,
+            comment: sanitizeUserComment(session.commentaire_session_pointage),
+            stopReasonCode: session.motif_arret_session?.code_motif_arret_session ?? null,
+            stopReasonLabel: session.motif_arret_session?.libelle_motif_arret_session ?? null,
+          })
+        }
+      }
+
+      if (!cancelled) {
+        setTodayLiveTasks(Array.from(grouped.values()).sort((a, b) => a.taskTitle.localeCompare(b.taskTitle)))
+      }
+    }
+
+    void loadTodayLiveTasks()
+    const refresh = window.setInterval(() => {
+      void loadTodayLiveTasks()
+    }, 30000)
+    return () => {
+      cancelled = true
+      window.clearInterval(refresh)
+    }
+  }, [selectedUserId, usersPointagesView])
+
+  useEffect(() => {
+    if (selectedUserId === null) {
       setAgendaDaySummaries({})
       return
     }
@@ -796,7 +1179,7 @@ export default function UtilisateursPage() {
         const taskMap = summariesByDay.get(sourcePointage.dateStamp) as Map<string, DayTaskSummary>
         const taskKey = buildTaskGroupingKey(sourcePointage.taskId, sourcePointage.taskTitle)
         const durationMs = getDurationMsBetween(session.debut_session_pointage, session.fin_session_pointage)
-        const latestComment = session.commentaire_session_pointage || '-'
+        const latestComment = sanitizeUserComment(session.commentaire_session_pointage) || '-'
         const existingSummary = taskMap.get(taskKey)
         const existingComment = existingSummary?.comment ?? '-'
         const shouldAppendComment =
@@ -907,6 +1290,31 @@ export default function UtilisateursPage() {
     [monthExpectedDurationMs]
   )
   const isMonthTargetReached = monthExpectedDurationMs !== null && monthWorkedDurationMs >= monthExpectedDurationMs
+  const selectedUserHasActivePointage = useMemo(() => {
+    if (selectedUserId === null) return false
+    const selectedUser = usersTabList.find((user) => user.id === selectedUserId)
+    return selectedUser?.hasActiveSession === true
+  }, [selectedUserId, usersTabList])
+  const todayViewDateLabel = useMemo(() => new Date().toLocaleDateString('fr-FR'), [tasksNowMs])
+  const todayLiveSummary = useMemo(() => {
+    const tasks = todayLiveTasks.map((task) => {
+      const totalDurationMs = task.sessions.reduce((sum, session) => {
+        const endIso = session.endIso ?? new Date(tasksNowMs).toISOString()
+        return sum + getDurationMsBetween(session.startIso, endIso)
+      }, 0)
+      return {
+        ...task,
+        totalDurationMs,
+      }
+    })
+    return {
+      totalWorkMs: tasks.reduce((sum, task) => sum + task.totalDurationMs, 0),
+      tasks,
+    }
+  }, [tasksNowMs, todayLiveTasks])
+  const isTodayLiveTargetReached =
+    selectedUserExpectedDailyDurationMs !== null &&
+    todayLiveSummary.totalWorkMs >= selectedUserExpectedDailyDurationMs
 
   const filteredAssignedTasks = useMemo(() => {
     const normalizedTerm = tasksSearchTerm.trim().toLocaleLowerCase('fr-FR')
@@ -1176,7 +1584,10 @@ export default function UtilisateursPage() {
                 className={`${styles.usersTabButton} ${
                   selectedUserTab === 'pointages' ? styles.usersTabButtonActive : ''
                 }`}
-                onClick={() => setSelectedUserTab('pointages')}
+                onClick={() => {
+                  setSelectedUserTab('pointages')
+                  setUsersPointagesView('aujourdhui')
+                }}
               >
                 Pointages
               </button>
@@ -1199,9 +1610,36 @@ export default function UtilisateursPage() {
           <div className={styles.zoneLabel}>Pointages</div>
         ) : selectedUserTab === 'profil' ? (
           <div className={styles.profileWrap}>
+            <div className={styles.profileHeaderRow}>
+              {selectedUserProfile?.statusCode ? (
+                <button
+                  type="button"
+                  className={`${styles.profileStatusActionBtn} ${
+                    selectedUserProfile.statusCode === 'ACTIVE'
+                      ? styles.profileStatusActionBtnDanger
+                      : styles.profileStatusActionBtnSuccess
+                  }`}
+                  onClick={() => {
+                    void updateSelectedUserStatus()
+                  }}
+                  disabled={profileStatusPending}
+                >
+                  {selectedUserProfile.statusCode === 'EN_ATTENTE'
+                    ? 'Approuver le compte'
+                    : selectedUserProfile.statusCode === 'ACTIVE'
+                      ? 'Désactiver'
+                      : 'Activer'}
+                </button>
+              ) : (
+                <div />
+              )}
+              <p className={styles.profileCreatedAtText}>
+                {`Compte créé le ${selectedUserProfile?.createdAtLabel ?? '--/--/----'}`}
+              </p>
+            </div>
             <div className={styles.profileGrid}>
               <div className={styles.profileField}>
-                <label className={styles.profileLabel}>Prénom utilisateur</label>
+                <label className={styles.profileLabel}>Prénom</label>
                 <input
                   type="text"
                   value={selectedUserProfile?.prenom ?? ''}
@@ -1210,7 +1648,7 @@ export default function UtilisateursPage() {
                 />
               </div>
               <div className={styles.profileField}>
-                <label className={styles.profileLabel}>Nom utilisateur</label>
+                <label className={styles.profileLabel}>Nom</label>
                 <input
                   type="text"
                   value={selectedUserProfile?.nom ?? ''}
@@ -1219,7 +1657,7 @@ export default function UtilisateursPage() {
                 />
               </div>
               <div className={styles.profileField}>
-                <label className={styles.profileLabel}>Username utilisateur</label>
+                <label className={styles.profileLabel}>Nom d'utilisateur</label>
                 <input
                   type="text"
                   value={selectedUserProfile?.username ?? ''}
@@ -1228,7 +1666,7 @@ export default function UtilisateursPage() {
                 />
               </div>
               <div className={styles.profileField}>
-                <label className={styles.profileLabel}>Email utilisateur</label>
+                <label className={styles.profileLabel}>Email</label>
                 <input
                   type="text"
                   value={selectedUserProfile?.email ?? ''}
@@ -1237,7 +1675,7 @@ export default function UtilisateursPage() {
                 />
               </div>
               <div className={styles.profileField}>
-                <label className={styles.profileLabel}>Téléphone utilisateur</label>
+                <label className={styles.profileLabel}>Téléphone</label>
                 <input
                   type="text"
                   value={selectedUserProfile?.telephone ?? ''}
@@ -1246,13 +1684,114 @@ export default function UtilisateursPage() {
                 />
               </div>
               <div className={styles.profileField}>
-                <label className={styles.profileLabel}>Adresse utilisateur</label>
+                <label className={styles.profileLabel}>Adresse</label>
                 <input
                   type="text"
                   value={selectedUserProfile?.adresse ?? ''}
                   readOnly
                   className={styles.profileInput}
                 />
+              </div>
+              <div className={styles.profileField}>
+                <label className={styles.profileLabel}>Fourchette horaire de pointage</label>
+                <div
+                  className={styles.pointageRangeRow}
+                  onBlur={() => {
+                    void saveSelectedUserPointageRange()
+                  }}
+                >
+                  <select
+                    className={styles.pointageRangeSelect}
+                    value={selectedUserProfile?.pointageStartHour ?? '08'}
+                    onChange={(event) =>
+                      setSelectedUserProfile((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              pointageStartHour: event.target.value,
+                            }
+                          : previous
+                      )
+                    }
+                    disabled={profileRangePending}
+                  >
+                    {Array.from({ length: 24 }, (_, hour) => (
+                      <option key={`start-hour-${hour}`} value={String(hour).padStart(2, '0')}>
+                        {String(hour).padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={styles.pointageRangeSep}>:</span>
+                  <select
+                    className={styles.pointageRangeSelect}
+                    value={selectedUserProfile?.pointageStartMinute ?? '00'}
+                    onChange={(event) =>
+                      setSelectedUserProfile((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              pointageStartMinute: event.target.value,
+                            }
+                          : previous
+                      )
+                    }
+                    disabled={profileRangePending}
+                  >
+                    {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(
+                      (minute) => (
+                        <option key={`start-minute-${minute}`} value={minute}>
+                          {minute}
+                        </option>
+                      )
+                    )}
+                  </select>
+                  <span className={styles.pointageRangeDash}>-</span>
+                  <select
+                    className={styles.pointageRangeSelect}
+                    value={selectedUserProfile?.pointageEndHour ?? '16'}
+                    onChange={(event) =>
+                      setSelectedUserProfile((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              pointageEndHour: event.target.value,
+                            }
+                          : previous
+                      )
+                    }
+                    disabled={profileRangePending}
+                  >
+                    {Array.from({ length: 24 }, (_, hour) => (
+                      <option key={`end-hour-${hour}`} value={String(hour).padStart(2, '0')}>
+                        {String(hour).padStart(2, '0')}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={styles.pointageRangeSep}>:</span>
+                  <select
+                    className={styles.pointageRangeSelect}
+                    value={selectedUserProfile?.pointageEndMinute ?? '00'}
+                    onChange={(event) =>
+                      setSelectedUserProfile((previous) =>
+                        previous
+                          ? {
+                              ...previous,
+                              pointageEndMinute: event.target.value,
+                            }
+                          : previous
+                      )
+                    }
+                    disabled={profileRangePending}
+                  >
+                    {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(
+                      (minute) => (
+                        <option key={`end-minute-${minute}`} value={minute}>
+                          {minute}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -1401,33 +1940,149 @@ export default function UtilisateursPage() {
           </div>
         ) : (
           <div className={styles.pointagesWrap}>
-            <div className={styles.pointagesViewsSwitch} role="tablist" aria-label="Vues pointages">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={usersPointagesView === 'aujourdhui'}
-                className={`${styles.pointagesViewButton} ${
-                  usersPointagesView === 'aujourdhui' ? styles.pointagesViewButtonActive : ''
-                }`}
-                onClick={() => setUsersPointagesView('aujourdhui')}
-              >
-                Aujourd&apos;hui
-              </button>
-              <span className={styles.pointagesViewsDivider} aria-hidden="true" />
-              <button
-                type="button"
-                role="tab"
-                aria-selected={usersPointagesView === 'agenda'}
-                className={`${styles.pointagesViewButton} ${
-                  usersPointagesView === 'agenda' ? styles.pointagesViewButtonActive : ''
-                }`}
-                onClick={() => setUsersPointagesView('agenda')}
-              >
-                Agenda
-              </button>
+            <div className={styles.pointagesTopRow}>
+              <div className={styles.pointagesViewsSwitch} role="tablist" aria-label="Vues pointages">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={usersPointagesView === 'aujourdhui'}
+                  className={`${styles.pointagesViewButton} ${
+                    usersPointagesView === 'aujourdhui' ? styles.pointagesViewButtonActive : ''
+                  }`}
+                  onClick={() => setUsersPointagesView('aujourdhui')}
+                >
+                  {`Aujourd'hui - ${todayViewDateLabel}`}
+                </button>
+                <span className={styles.pointagesViewsDivider} aria-hidden="true" />
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={usersPointagesView === 'agenda'}
+                  className={`${styles.pointagesViewButton} ${
+                    usersPointagesView === 'agenda' ? styles.pointagesViewButtonActive : ''
+                  }`}
+                  onClick={() => setUsersPointagesView('agenda')}
+                >
+                  Agenda
+                </button>
+              </div>
             </div>
             {usersPointagesView === 'aujourdhui' ? (
-              <div className={styles.zoneLabel}>Aujourd&apos;hui</div>
+              <article className={styles.monthDetailEmptyCard}>
+                {(() => {
+                  if (todayLiveSummary.tasks.length === 0) {
+                    return (
+                      <div className={styles.tasksEmptyState}>
+                        <p className={styles.tasksStateText}>Aucune donnée de pointage aujourd&apos;hui</p>
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className={styles.monthDetailSummaryWrap}>
+                      <div className={styles.todayPointageHeader}>
+                        <div className={styles.todayPointageStatus}>
+                          <span
+                            className={`${styles.todayPointageStatusDot} ${
+                              selectedUserHasActivePointage
+                                ? styles.todayPointageStatusDotRunning
+                                : styles.todayPointageStatusDotFinished
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className={styles.todayPointageStatusText}>
+                            {selectedUserHasActivePointage ? 'Pointage en cours' : 'Pointage terminé'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`${styles.monthDetailSummaryTotal} ${
+                          selectedUserExpectedDailyDurationMs === null
+                            ? ''
+                            : isTodayLiveTargetReached
+                              ? styles.monthDetailSummaryTotalReached
+                              : styles.monthDetailSummaryTotalMissed
+                        }`}
+                        onClick={() => {
+                          void openPointageBoundsOverlay(new Date())
+                        }}
+                      >
+                        {formatDuration(todayLiveSummary.totalWorkMs)}
+                      </button>
+                      <div className={styles.daySummaryTasks}>
+                        {todayLiveSummary.tasks.map((task) => (
+                          <div
+                            key={task.taskKey}
+                            className={styles.daySummaryTaskRow}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              void openTaskSessionsOverlay(new Date(), {
+                                taskKey: task.taskKey,
+                                taskId: task.taskId,
+                                taskTitle: task.taskTitle,
+                                comment: '-',
+                                totalDurationMs: task.totalDurationMs,
+                              })
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                void openTaskSessionsOverlay(new Date(), {
+                                  taskKey: task.taskKey,
+                                  taskId: task.taskId,
+                                  taskTitle: task.taskTitle,
+                                  comment: '-',
+                                  totalDurationMs: task.totalDurationMs,
+                                })
+                              }
+                            }}
+                          >
+                            <div className={styles.daySummaryTaskMain}>
+                              <span className={styles.daySummaryTaskTitle}>{task.taskTitle}</span>
+                              <span className={styles.daySummaryTaskDuration}>
+                                {formatDuration(task.totalDurationMs)}
+                              </span>
+                            </div>
+                            <div className={styles.daySummaryTaskComment}>
+                              {task.sessions.map((session, index) => {
+                                const isOngoing = !session.endIso
+                                const trimmedComment = session.comment?.trim() ?? ''
+                                const shouldShowStopReason =
+                                  session.stopReasonCode === 'ARRET_AUTO' ||
+                                  session.stopReasonCode === 'INACTIVITE'
+                                const stopReasonUpper =
+                                  shouldShowStopReason && session.stopReasonLabel
+                                    ? session.stopReasonLabel.toUpperCase()
+                                    : ''
+                                return (
+                                  <div key={`${task.taskKey}-today-session-${index}`} className={styles.commentLine}>
+                                    <span className={styles.commentMarker}>&gt;</span>{' '}
+                                    {`Session ${index + 1} : ${formatTimeLabel(session.startIso)} - ${
+                                      isOngoing ? '' : formatTimeLabel(session.endIso as string)
+                                    }`}
+                                    {trimmedComment ? ` | ${trimmedComment}` : ''}
+                                    {stopReasonUpper ? (
+                                      <>
+                                        {' | '}
+                                        <span className={styles.todaySessionStopReason}>{`(${stopReasonUpper})`}</span>
+                                      </>
+                                    ) : null}
+                                    {isOngoing ? (
+                                      <span className={styles.todaySessionRunning}>{' (EN COURS)'}</span>
+                                    ) : null}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </article>
             ) : (
           <div className={styles.agendaWrap}>
             <div className={styles.agendaHeader}>
@@ -1493,7 +2148,7 @@ export default function UtilisateursPage() {
                   onClick={resetToToday}
                   aria-label="Revenir à aujourd'hui"
                 >
-                  Aujourd'hui
+                  Aujourd&apos;hui
                 </button>
               ) : null}
               {monthExpectedDurationParts ? (

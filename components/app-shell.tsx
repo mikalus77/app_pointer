@@ -296,8 +296,8 @@ export function AppShell({
                               }`}
                               title={
                                 user.hasActiveSession
-                                  ? 'Utilisateur connecté (session en cours)'
-                                  : 'Utilisateur non connecté'
+                                  ? 'Pointage en cours'
+                                  : 'Aucun pointage en cours'
                               }
                             />
                           )}

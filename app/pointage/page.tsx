@@ -12,11 +12,13 @@ const CONNECTED_USERNAME_STORAGE_KEY = 'app_pointer_connected_username'
 const UI_STATE_CHANGED_EVENT = 'app_pointer_ui_state_changed'
 const CONNECTED_USERNAME_CHANGED_EVENT = 'app_pointer_connected_username_changed'
 const OTHER_TASK_LABEL = 'Autre tÃ¢che'
-const WORK_OFFLINE_GRACE_MINUTES = 5
+const WORK_OFFLINE_GRACE_MINUTES = 8
 const PAUSE_AUTO_STOP_MINUTES = 65
 const INACTIVITY_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000
 const INACTIVITY_RESPONSE_WINDOW_MS = 5 * 60 * 1000
 const INACTIVITY_REMINDER_DELAY_MS = 10 * 60 * 1000
+const NO_SIGNAL_ALERT_DELAY_MS = 3 * 60 * 1000
+const NO_SIGNAL_RESPONSE_WINDOW_MS = 2 * 60 * 1000
 const NON_MANUAL_STOP_REASON_CODES = new Set(['ARRET_AUTO', 'INACTIVITE'])
 type StopReasonCode = 'ARRET_MANUEL' | 'INACTIVITE' | 'ARRET_AUTO'
 
@@ -348,7 +350,11 @@ function isSystemAutoStopComment(comment: string) {
     normalizedComment.startsWith('session arrêtée automatiquement après') ||
     normalizedComment.startsWith('session arretee automatiquement apres') ||
     normalizedComment.startsWith('pause arrêtée automatiquement après') ||
-    normalizedComment.startsWith('pause arretee automatiquement apres')
+    normalizedComment.startsWith('pause arretee automatiquement apres') ||
+    normalizedComment.startsWith('session arrêtée pour inactivité') ||
+    normalizedComment.startsWith('session arretee pour inactivite') ||
+    normalizedComment.startsWith("arrêt à cause de") ||
+    normalizedComment.startsWith('arret a cause de')
   )
 }
 
@@ -525,6 +531,7 @@ export default function AccueilPage() {
   const inactivityLastCheckResponseAtRef = useRef<number | null>(null)
   const inactivityReminderSentRef = useRef(false)
   const inactivityNotificationRef = useRef<Notification | null>(null)
+  const lastBrowserSignalAtRef = useRef<number | null>(null)
   const pointageCommentRef = useRef(pointageComment)
   const pauseCommentRef = useRef(pauseComment)
   const pointageModeRef = useRef(pointageMode)
@@ -840,22 +847,26 @@ export default function AccueilPage() {
     })
 
     if (!result.ok) {
-      return false
+      return { ok: false, didAutoClose: false }
     }
 
     const rows = Array.isArray(result.data.rows) ? result.data.rows : []
-    return rows.some(
-      (row) =>
-        typeof row?.closed_session_id === 'number' || typeof row?.closed_pause_id === 'number'
-    )
+    return {
+      ok: true,
+      didAutoClose: rows.some(
+        (row) =>
+          typeof row?.closed_session_id === 'number' || typeof row?.closed_pause_id === 'number'
+      ),
+    }
   }, [postPointageApi])
 
   const sendPointageHeartbeat = useCallback(async () => {
     if (pointageMode === 'idle') {
-      return
+      return false
     }
 
-    await postPointageApi('/api/pointage/heartbeat')
+    const result = await postPointageApi('/api/pointage/heartbeat')
+    return result.ok
   }, [pointageMode, postPointageApi])
 
   const autoValidateDayIfNoActiveSession = useCallback(
@@ -993,11 +1004,17 @@ export default function AccueilPage() {
       void (async () => {
         await syncServerClock()
         if (connectedUserId) {
-          const didAutoClose = await applyAutoClosureForUser()
-          if (didAutoClose) {
+          const autoClosure = await applyAutoClosureForUser()
+          if (autoClosure.ok) {
+            lastBrowserSignalAtRef.current = Date.now()
+          }
+          if (autoClosure.didAutoClose) {
             setPointageRefreshKey((previousKey) => previousKey + 1)
           } else {
-            await sendPointageHeartbeat()
+            const heartbeatOk = await sendPointageHeartbeat()
+            if (heartbeatOk) {
+              lastBrowserSignalAtRef.current = Date.now()
+            }
           }
         }
       })()
@@ -2891,12 +2908,18 @@ export default function AccueilPage() {
       void (async () => {
         await syncServerClock()
         if (connectedUserId) {
-          const didAutoClose = await applyAutoClosureForUser()
-          if (didAutoClose) {
+          const autoClosure = await applyAutoClosureForUser()
+          if (autoClosure.ok) {
+            lastBrowserSignalAtRef.current = Date.now()
+          }
+          if (autoClosure.didAutoClose) {
             setPointageRefreshKey((previousKey) => previousKey + 1)
             return
           }
-          await sendPointageHeartbeat()
+          const heartbeatOk = await sendPointageHeartbeat()
+          if (heartbeatOk) {
+            lastBrowserSignalAtRef.current = Date.now()
+          }
         }
         await rolloverActivePointageAtMidnight()
       })()
@@ -3073,8 +3096,11 @@ export default function AccueilPage() {
     }
 
     await syncServerClock()
-    const didAutoClose = await applyAutoClosureForUser()
-    if (didAutoClose) {
+    const autoClosure = await applyAutoClosureForUser()
+    if (autoClosure.ok) {
+      lastBrowserSignalAtRef.current = Date.now()
+    }
+    if (autoClosure.didAutoClose) {
       setPointageRefreshKey((previousKey) => previousKey + 1)
     }
 
@@ -3211,6 +3237,7 @@ export default function AccueilPage() {
 
   const acknowledgeInactivityAndContinue = () => {
     inactivityLastCheckResponseAtRef.current = Date.now()
+    lastBrowserSignalAtRef.current = Date.now()
     inactivityPromptShownAtRef.current = null
     inactivityReminderSentRef.current = false
     inactivityStopInProgressRef.current = false
@@ -3218,7 +3245,7 @@ export default function AccueilPage() {
     closeInactivityNotification()
   }
 
-  const stopPointageFromInactivityPrompt = async () => {
+  const stopPointageFromInactivityPrompt = useCallback(async () => {
     inactivityStopInProgressRef.current = true
     inactivityPromptShownAtRef.current = null
     setShowInactivityPrompt(false)
@@ -3239,7 +3266,67 @@ export default function AccueilPage() {
     }
     setPointageMutationPending(false)
     inactivityStopInProgressRef.current = false
-  }
+  }, [
+    closeCurrentSession,
+    closeInactivityNotification,
+    currentSessionPointageId,
+    pointageComment,
+    pointageMutationPending,
+  ])
+
+  useEffect(() => {
+    if (pointageMode !== 'running') {
+      lastBrowserSignalAtRef.current = null
+      return
+    }
+
+    if (lastBrowserSignalAtRef.current === null) {
+      lastBrowserSignalAtRef.current = Date.now()
+    }
+
+    const checkBrowserSignal = window.setInterval(() => {
+      if (pointageMutationPending || inactivityStopInProgressRef.current || pointageMode !== 'running') {
+        return
+      }
+
+      const now = Date.now()
+      const lastSignalAt = lastBrowserSignalAtRef.current
+      if (lastSignalAt === null) {
+        return
+      }
+
+      if (!showInactivityPrompt) {
+        if (now - lastSignalAt >= NO_SIGNAL_ALERT_DELAY_MS) {
+          inactivityPromptShownAtRef.current = now
+          inactivityReminderSentRef.current = false
+          setShowInactivityPrompt(true)
+          playInactivityTone()
+          notifyInactivity()
+        }
+        return
+      }
+
+      const promptShownAt = inactivityPromptShownAtRef.current
+      if (promptShownAt === null) {
+        return
+      }
+
+      if (now - promptShownAt >= NO_SIGNAL_RESPONSE_WINDOW_MS) {
+        void stopPointageFromInactivityPrompt()
+      }
+    }, 1000)
+
+    return () => {
+      window.clearInterval(checkBrowserSignal)
+    }
+  }, [
+    notifyInactivity,
+    playInactivityTone,
+    pointageMode,
+    pointageMutationPending,
+    showInactivityPrompt,
+    stopPointageFromInactivityPrompt,
+  ])
 
   useEffect(() => {
     if (pointageMode !== 'running') {
@@ -4112,7 +4199,9 @@ export default function AccueilPage() {
           <div className={styles.inactivityToastHeader}>Jarvis Time</div>
           <div className={styles.inactivityToastBody}>
             <p className={styles.inactivityToastMessage}>
-              {`Toujours en activité${connectedUsername ? ` ${connectedUsername}` : ''} ? Répondez sous 5 minutes.`}
+              {connectedUsername
+                ? `Toujours en activité "${connectedUsername}" ?`
+                : 'Toujours en activité ?'}
             </p>
             <button
               type="button"
