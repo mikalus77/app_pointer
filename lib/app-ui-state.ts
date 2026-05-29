@@ -7,6 +7,7 @@ export type ActiveMenu =
   | 'accueil'
   | 'pointer'
   | 'taches'
+  | 'interventions'
   | 'demandes'
   | 'suivi_activites'
   | 'gestion_demandes'

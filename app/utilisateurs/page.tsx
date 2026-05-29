@@ -94,9 +94,20 @@ type AssignedTaskListItem = {
   dueAtMs: number | null
 }
 
+type UserInterventionRow = {
+  id: number
+  date: string
+  lieu: string
+  appels: number
+  debut: string
+  fin: string
+  commentaire: string
+}
+
 type TasksSortKey = 'title' | 'priority' | 'deadline'
 type TasksSortDirection = 'asc' | 'desc'
 type TaskStatusTab = 'EN_COURS' | 'REUSSIE' | 'ECHOUEE'
+type AppRoleCode = 'ADMIN' | 'EMPLOYE' | 'INTERVENANT' | 'RESPONSABLE_INTERVENTION'
 
 function padTimeUnit(value: number) {
   return String(value).padStart(2, '0')
@@ -245,6 +256,38 @@ function normalizeStatusCode(value: unknown): 'EN_ATTENTE' | 'ACTIVE' | 'DESACTI
   return null
 }
 
+function normalizeRoleCode(value: unknown): AppRoleCode | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toUpperCase()
+  if (
+    normalized === 'ADMIN' ||
+    normalized === 'EMPLOYE' ||
+    normalized === 'INTERVENANT' ||
+    normalized === 'RESPONSABLE_INTERVENTION'
+  ) {
+    return normalized
+  }
+  return null
+}
+
+function findRoleInUnknown(value: unknown): AppRoleCode | null {
+  if (typeof value === 'string') return normalizeRoleCode(value)
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const resolved = findRoleInUnknown(entry)
+      if (resolved) return resolved
+    }
+    return null
+  }
+  if (value && typeof value === 'object') {
+    for (const nested of Object.values(value as Record<string, unknown>)) {
+      const resolved = findRoleInUnknown(nested)
+      if (resolved) return resolved
+    }
+  }
+  return null
+}
+
 function pickCreatedAtLabel(row: Record<string, unknown>) {
   const candidates = [
     row.date_creation_utilisateur,
@@ -287,6 +330,17 @@ function rangeToExpectedMinutes(startHour: string, startMinute: string, endHour:
     return null
   }
   return end - start
+}
+
+function formatInterventionDuration(startHm: string, endHm: string) {
+  const matchStart = startHm.match(/^(\d{2}):(\d{2})/)
+  const matchEnd = endHm.match(/^(\d{2}):(\d{2})/)
+  if (!matchStart || !matchEnd) return '--'
+  const start = Number(matchStart[1]) * 60 + Number(matchStart[2])
+  const end = Number(matchEnd[1]) * 60 + Number(matchEnd[2])
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '--'
+  const total = end - start
+  return `${Math.floor(total / 60)} h ${total % 60} min`
 }
 
 function pickFirstTimeValue(row: Record<string, unknown>, candidates: string[]) {
@@ -472,7 +526,7 @@ export default function UtilisateursPage() {
     () => ''
   )
   const [connectedUserId, setConnectedUserId] = useState<number | null>(null)
-  const [connectedUserRole, setConnectedUserRole] = useState<'ADMIN' | 'EMPLOYE'>('EMPLOYE')
+  const [connectedUserRole, setConnectedUserRole] = useState<AppRoleCode>('EMPLOYE')
   const [usersTabList, setUsersTabList] = useState<
     Array<{
       id: number
@@ -484,7 +538,7 @@ export default function UtilisateursPage() {
   >([])
   const [usersTabLoading, setUsersTabLoading] = useState(false)
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
-  const [selectedUserTab, setSelectedUserTab] = useState<'profil' | 'pointages' | 'taches'>('profil')
+  const [selectedUserTab, setSelectedUserTab] = useState<'interventions' | 'profil' | 'pointages' | 'taches'>('profil')
   const [selectedUserProfile, setSelectedUserProfile] = useState<SelectedUserProfile | null>(null)
   const [profileStatusPending, setProfileStatusPending] = useState(false)
   const [profileRangePending, setProfileRangePending] = useState(false)
@@ -510,9 +564,26 @@ export default function UtilisateursPage() {
   const [usersTasksStatusTab, setUsersTasksStatusTab] = useState<TaskStatusTab>('EN_COURS')
   const [tasksNowMs, setTasksNowMs] = useState(() => Date.now())
   const [taskCollaboratorsByTaskId, setTaskCollaboratorsByTaskId] = useState<Map<number, string[]>>(new Map())
+  const [userInterventions, setUserInterventions] = useState<UserInterventionRow[]>([])
+  const [userInterventionsLoading, setUserInterventionsLoading] = useState(false)
+  const [userInterventionsError, setUserInterventionsError] = useState('')
+  const [userInterventionDateFrom, setUserInterventionDateFrom] = useState('')
+  const [userInterventionDateTo, setUserInterventionDateTo] = useState('')
+  const [userInterventionCommentOverlay, setUserInterventionCommentOverlay] = useState<{
+    x: number
+    y: number
+    content: string
+  } | null>(null)
 
   const { activeMenu, activeDemandesSubMenu, activeConfigurationSubMenu, activeConfigurationTab } =
     uiState
+  const isResponsableIntervention = connectedUserRole === 'RESPONSABLE_INTERVENTION'
+
+  useEffect(() => {
+    if (isResponsableIntervention && selectedUserTab !== 'interventions') {
+      setSelectedUserTab('interventions')
+    }
+  }, [isResponsableIntervention, selectedUserTab])
 
   const todayAtLoad = useMemo(() => new Date(), [])
   const [selectedDay, setSelectedDay] = useState(todayAtLoad.getDate())
@@ -586,7 +657,7 @@ export default function UtilisateursPage() {
       const userId = Number(payload.userId ?? payload.user?.id ?? NaN)
       if (!cancelled) {
         setConnectedUserId(Number.isFinite(userId) ? userId : null)
-        setConnectedUserRole(payload.role === 'ADMIN' ? 'ADMIN' : 'EMPLOYE')
+        setConnectedUserRole(normalizeRoleCode(payload.role) ?? 'EMPLOYE')
       }
     }
 
@@ -629,6 +700,43 @@ export default function UtilisateursPage() {
         hasActiveSession: false,
       }))
 
+      const roleByUserId = new Map<number, AppRoleCode>()
+      const userIds = normalizedUsers.map((user) => user.id)
+      if (userIds.length > 0) {
+        const { data: roleRows } = await supabase
+          .from('utilisateur_role')
+          .select('*')
+          .in('id_utilisateur', userIds)
+
+        for (const roleRow of roleRows ?? []) {
+          const userId = Number((roleRow as Record<string, unknown>).id_utilisateur)
+          if (!Number.isFinite(userId)) continue
+          const roleCode = findRoleInUnknown(roleRow)
+          if (roleCode) roleByUserId.set(userId, roleCode)
+        }
+
+        const relationSelects = ['*, role_utilisateur(*)', '*, utilisateur_role(*)', '*, role(*)']
+        for (const selectSpec of relationSelects) {
+          const { data: linkedRows } = await supabase
+            .from('utilisateur_role')
+            .select(selectSpec)
+            .in('id_utilisateur', userIds)
+          for (const linkedRow of linkedRows ?? []) {
+            const userId = Number((linkedRow as Record<string, unknown>).id_utilisateur)
+            if (!Number.isFinite(userId) || roleByUserId.has(userId)) continue
+            const roleCode = findRoleInUnknown(linkedRow)
+            if (roleCode) roleByUserId.set(userId, roleCode)
+          }
+        }
+      }
+
+      const filteredByRole = normalizedUsers.filter((user) => {
+        const userRoleCode = roleByUserId.get(user.id) ?? 'EMPLOYE'
+        if (userRoleCode === 'RESPONSABLE_INTERVENTION') return false
+        if (connectedUserRole === 'RESPONSABLE_INTERVENTION') return userRoleCode === 'INTERVENANT'
+        return true
+      })
+
       const activeCandidateUserIds = normalizedUsers
         .filter((user) => user.statusCode === 'ACTIVE')
         .map((user) => user.id)
@@ -661,10 +769,10 @@ export default function UtilisateursPage() {
           }
         }
       }
-      setUsersTabList(normalizedUsers)
+      setUsersTabList(filteredByRole)
       setSelectedUserId((previous) => {
-        if (previous !== null && normalizedUsers.some((user) => user.id === previous)) return previous
-        return normalizedUsers.length > 0 ? normalizedUsers[0].id : null
+        if (previous !== null && filteredByRole.some((user) => user.id === previous)) return previous
+        return filteredByRole.length > 0 ? filteredByRole[0].id : null
       })
       setUsersTabLoading(false)
     }
@@ -673,7 +781,7 @@ export default function UtilisateursPage() {
     return () => {
       cancelled = true
     }
-  }, [connectedUserId])
+  }, [connectedUserId, connectedUserRole])
 
   useEffect(() => {
     if (selectedUserId === null) {
@@ -1020,6 +1128,56 @@ export default function UtilisateursPage() {
   }, [selectedUserId, usersTasksStatusTab])
 
   useEffect(() => {
+    if (selectedUserId === null || selectedUserTab !== 'interventions') {
+      setUserInterventions([])
+      setUserInterventionsError('')
+      setUserInterventionsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const loadUserInterventions = async () => {
+      setUserInterventionsLoading(true)
+      setUserInterventionsError('')
+
+      const { data, error } = await supabase
+        .from('intervention')
+        .select(
+          'id_intervention, id_utilisateur, date_intervention, lieu_intervention, nombre_appels_intervention, debut_intervention, fin_intervention, commentaire_intervention'
+        )
+        .eq('id_utilisateur', selectedUserId)
+        .order('date_intervention', { ascending: false })
+        .order('debut_intervention', { ascending: false })
+
+      if (cancelled) return
+      if (error || !data) {
+        setUserInterventions([])
+        setUserInterventionsError('Impossible de charger les interventions.')
+        setUserInterventionsLoading(false)
+        return
+      }
+
+      const nextRows: UserInterventionRow[] = data.map((row) => ({
+        id: Number(row.id_intervention),
+        date: String(row.date_intervention ?? ''),
+        lieu: String(row.lieu_intervention ?? ''),
+        appels: Number(row.nombre_appels_intervention ?? 0),
+        debut: String(row.debut_intervention ?? '').match(/^(\d{2}:\d{2})/)?.[1] ?? '',
+        fin: String(row.fin_intervention ?? '').match(/^(\d{2}:\d{2})/)?.[1] ?? '',
+        commentaire: String(row.commentaire_intervention ?? ''),
+      }))
+
+      setUserInterventions(nextRows)
+      setUserInterventionsLoading(false)
+    }
+
+    void loadUserInterventions()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedUserId, selectedUserTab])
+
+  useEffect(() => {
     const tick = window.setInterval(() => {
       setTasksNowMs(Date.now())
     }, 1000)
@@ -1300,6 +1458,23 @@ export default function UtilisateursPage() {
     () => formatDurationParts(monthWorkedDurationMs),
     [monthWorkedDurationMs]
   )
+
+  const filteredUserInterventions = useMemo(() => {
+    if (!userInterventionDateFrom && !userInterventionDateTo) return userInterventions
+    const start =
+      userInterventionDateFrom && userInterventionDateTo
+        ? userInterventionDateFrom <= userInterventionDateTo
+          ? userInterventionDateFrom
+          : userInterventionDateTo
+        : userInterventionDateFrom || userInterventionDateTo
+    const end =
+      userInterventionDateFrom && userInterventionDateTo
+        ? userInterventionDateFrom <= userInterventionDateTo
+          ? userInterventionDateTo
+          : userInterventionDateFrom
+        : userInterventionDateTo || userInterventionDateFrom
+    return userInterventions.filter((row) => row.date >= start && row.date <= end)
+  }, [userInterventions, userInterventionDateFrom, userInterventionDateTo])
   const monthExpectedDurationParts = useMemo(
     () => (monthExpectedDurationMs === null ? null : formatDurationParts(monthExpectedDurationMs)),
     [monthExpectedDurationMs]
@@ -1535,6 +1710,7 @@ export default function UtilisateursPage() {
       if (menu === 'accueil') router.push('/accueil')
       else if (menu === 'pointer') router.push('/pointage')
       else if (menu === 'taches') router.push('/taches')
+      else if (menu === 'interventions') router.push('/interventions')
       else if (menu === 'gestion_taches') router.push('/gestion-des-activites')
     },
     [activeMenu, router]
@@ -1584,45 +1760,199 @@ export default function UtilisateursPage() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={selectedUserTab === 'profil'}
+                aria-selected={selectedUserTab === 'interventions'}
                 className={`${styles.usersTabButton} ${
-                  selectedUserTab === 'profil' ? styles.usersTabButtonActive : ''
+                  selectedUserTab === 'interventions' ? styles.usersTabButtonActive : ''
                 }`}
-                onClick={() => setSelectedUserTab('profil')}
+                onClick={() => setSelectedUserTab('interventions')}
               >
-                Profil
+                Interventions
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedUserTab === 'pointages'}
-                className={`${styles.usersTabButton} ${
-                  selectedUserTab === 'pointages' ? styles.usersTabButtonActive : ''
-                }`}
-                onClick={() => {
-                  setSelectedUserTab('pointages')
-                  setUsersPointagesView('aujourdhui')
-                }}
-              >
-                Pointages
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedUserTab === 'taches'}
-                className={`${styles.usersTabButton} ${
-                  selectedUserTab === 'taches' ? styles.usersTabButtonActive : ''
-                }`}
-                onClick={() => setSelectedUserTab('taches')}
-              >
-                Tâches
-              </button>
+              {!isResponsableIntervention ? (
+                <>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedUserTab === 'profil'}
+                    className={`${styles.usersTabButton} ${
+                      selectedUserTab === 'profil' ? styles.usersTabButtonActive : ''
+                    }`}
+                    onClick={() => setSelectedUserTab('profil')}
+                  >
+                    Profil
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedUserTab === 'pointages'}
+                    className={`${styles.usersTabButton} ${
+                      selectedUserTab === 'pointages' ? styles.usersTabButtonActive : ''
+                    }`}
+                    onClick={() => {
+                      setSelectedUserTab('pointages')
+                      setUsersPointagesView('aujourdhui')
+                    }}
+                  >
+                    Pointages
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedUserTab === 'taches'}
+                    className={`${styles.usersTabButton} ${
+                      selectedUserTab === 'taches' ? styles.usersTabButtonActive : ''
+                    }`}
+                    onClick={() => setSelectedUserTab('taches')}
+                  >
+                    Tâches
+                  </button>
+                </>
+              ) : null}
             </div>
           ) : null
         }
       >
         {selectedUserId === null ? (
           <div className={styles.zoneLabel}>Pointages</div>
+        ) : selectedUserTab === 'interventions' ? (
+          <div className={styles.tasksSection}>
+            <div className={styles.tasksBody}>
+              <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8, marginBottom: 32 }}>
+                <input
+                  type="date"
+                  value={userInterventionDateFrom}
+                  onChange={(event) => setUserInterventionDateFrom(event.target.value)}
+                  className={styles.tasksSearchInput}
+                  style={{ width: 210, height: 38 }}
+                  aria-label="Date début interventions"
+                  title="Date début"
+                />
+                <input
+                  type="date"
+                  value={userInterventionDateTo}
+                  onChange={(event) => setUserInterventionDateTo(event.target.value)}
+                  className={styles.tasksSearchInput}
+                  style={{ width: 210, height: 38 }}
+                  aria-label="Date fin interventions"
+                  title="Date fin"
+                />
+              </div>
+              {userInterventionsLoading ? (
+                <div className={styles.tasksEmptyState}>
+                  <p className={styles.tasksStateText}>Chargement des interventions...</p>
+                </div>
+              ) : userInterventionsError ? (
+                <div className={styles.tasksEmptyState}>
+                  <p className={styles.tasksStateText}>{userInterventionsError}</p>
+                </div>
+              ) : filteredUserInterventions.length === 0 ? (
+                <div className={styles.tasksEmptyState}>
+                  <p className={styles.tasksStateText}>Aucune intervention</p>
+                </div>
+              ) : (
+                <div style={{ border: '1px solid #c8d6e7', borderRadius: 12, overflow: 'hidden', background: '#f8fafd' }}>
+                  <table className={styles.tasksTable} style={{ border: 'none', borderRadius: 0 }}>
+                    <thead>
+                      <tr>
+                        <th scope="col" style={{ width: '10%' }}>DATE</th>
+                        <th scope="col" style={{ width: '37%' }}>LIEU</th>
+                        <th scope="col" style={{ width: '10%' }}>APPELS</th>
+                        <th scope="col" style={{ width: '10%' }}>DEBUT</th>
+                        <th scope="col" style={{ width: '10%' }}>FIN</th>
+                        <th scope="col" style={{ width: '12%' }}>DUREE</th>
+                        <th scope="col" style={{ width: '11%' }}>COMMENTAIRE</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUserInterventions.map((row) => (
+                        <tr key={row.id}>
+                          <td>{row.date ? new Date(row.date).toLocaleDateString('fr-FR') : '--'}</td>
+                          <td>
+                            <HoverScrollText text={row.lieu || '--'} className={styles.taskDescriptionCell} />
+                          </td>
+                          <td>{row.appels}</td>
+                          <td>{row.debut || '--'}</td>
+                          <td>{row.fin || '--'}</td>
+                          <td>{formatInterventionDuration(row.debut, row.fin)}</td>
+                          <td>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                            <button
+                              type="button"
+                              aria-label="Voir le commentaire"
+                              title="Commentaire"
+                              style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 8,
+                                border: '1px solid #b7cbe3',
+                                background: '#f5f8fc',
+                                color: '#2f4f76',
+                                cursor: 'pointer',
+                                padding: 0,
+                                lineHeight: 1,
+                              }}
+                              onMouseEnter={(event) =>
+                                setUserInterventionCommentOverlay({
+                                  x: event.clientX,
+                                  y: event.clientY,
+                                  content: row.commentaire || '',
+                                })
+                              }
+                              onMouseMove={(event) =>
+                                setUserInterventionCommentOverlay((previous) =>
+                                  previous
+                                    ? { ...previous, x: event.clientX, y: event.clientY }
+                                    : { x: event.clientX, y: event.clientY, content: '' }
+                                )
+                              }
+                              onMouseLeave={() => setUserInterventionCommentOverlay(null)}
+                            >
+                              💬
+                            </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            {userInterventionCommentOverlay ? (
+              <div
+                style={{
+                  ...(typeof window !== 'undefined'
+                    ? {
+                        left: Math.max(12, Math.min(userInterventionCommentOverlay.x + 14, window.innerWidth - 572)),
+                        top: Math.max(12, Math.min(userInterventionCommentOverlay.y + 14, window.innerHeight - 92)),
+                      }
+                    : { left: 12, top: 12 }),
+                  position: 'fixed',
+                  minWidth: 220,
+                  minWidth: 340,
+                  maxWidth: 560,
+                  minHeight: 38,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: '1px solid #b7cbe3',
+                  background: '#f5f8fc',
+                  color: '#2f4f76',
+                  fontFamily: 'Poppins, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                  wordBreak: 'break-word',
+                  textAlign: 'left',
+                  boxShadow: '0 8px 22px rgba(24, 43, 66, 0.18)',
+                  pointerEvents: 'none',
+                  zIndex: 3000,
+                }}
+              >
+                {userInterventionCommentOverlay.content}
+              </div>
+            ) : null}
+          </div>
         ) : selectedUserTab === 'profil' ? (
           <div className={styles.profileWrap}>
             <div className={styles.profileHeaderRow}>

@@ -8,6 +8,22 @@ import {
   createSessionToken,
 } from '../../../../lib/session'
 
+type AppRole = 'ADMIN' | 'EMPLOYE' | 'INTERVENANT' | 'RESPONSABLE_INTERVENTION'
+
+function normalizeRoleCode(value: unknown): AppRole | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toUpperCase()
+  if (
+    normalized === 'ADMIN' ||
+    normalized === 'EMPLOYE' ||
+    normalized === 'INTERVENANT' ||
+    normalized === 'RESPONSABLE_INTERVENTION'
+  ) {
+    return normalized
+  }
+  return null
+}
+
 function extractRoleCode(row: Record<string, unknown> | null | undefined) {
   if (!row) return null
 
@@ -17,7 +33,8 @@ function extractRoleCode(row: Record<string, unknown> | null | undefined) {
       : typeof row.code_role_utilisateur === 'string'
         ? row.code_role_utilisateur
         : null
-  if (directRole === 'ADMIN' || directRole === 'EMPLOYE') return directRole
+  const normalizedDirect = normalizeRoleCode(directRole)
+  if (normalizedDirect) return normalizedDirect
 
   const nestedRole = row.id_utilisateur_role
   if (Array.isArray(nestedRole) && nestedRole.length > 0) {
@@ -28,7 +45,8 @@ function extractRoleCode(row: Record<string, unknown> | null | undefined) {
         : typeof nested?.code_role_utilisateur === 'string'
           ? nested.code_role_utilisateur
           : null
-    if (nestedCode === 'ADMIN' || nestedCode === 'EMPLOYE') return nestedCode
+    const normalizedNested = normalizeRoleCode(nestedCode)
+    if (normalizedNested) return normalizedNested
   }
 
   if (nestedRole && typeof nestedRole === 'object') {
@@ -39,19 +57,16 @@ function extractRoleCode(row: Record<string, unknown> | null | undefined) {
         : typeof nested.code_role_utilisateur === 'string'
           ? nested.code_role_utilisateur
           : null
-    if (nestedCode === 'ADMIN' || nestedCode === 'EMPLOYE') return nestedCode
+    const normalizedNested = normalizeRoleCode(nestedCode)
+    if (normalizedNested) return normalizedNested
   }
 
   return null
 }
 
-function findRoleInUnknown(value: unknown): 'ADMIN' | 'EMPLOYE' | null {
+function findRoleInUnknown(value: unknown): AppRole | null {
   if (typeof value === 'string') {
-    const normalized = value.trim().toUpperCase()
-    if (normalized === 'ADMIN' || normalized === 'EMPLOYE') {
-      return normalized
-    }
-    return null
+    return normalizeRoleCode(value)
   }
 
   if (Array.isArray(value)) {

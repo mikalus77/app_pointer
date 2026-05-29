@@ -97,6 +97,7 @@ type ActiveMenu =
   | 'accueil'
   | 'pointer'
   | 'taches'
+  | 'interventions'
   | 'demandes'
   | 'suivi_activites'
   | 'gestion_demandes'
@@ -1099,6 +1100,10 @@ export default function AccueilPage() {
     }
     if (menu === 'taches') {
       router.push('/taches')
+      return
+    }
+    if (menu === 'interventions') {
+      router.push('/interventions')
       return
     }
     router.push('/accueil')
@@ -3550,6 +3555,7 @@ export default function AccueilPage() {
     accueil: 'Mon agenda',
     pointer: 'Mon pointage',
     taches: 'Mes tÃ¢ches',
+    interventions: 'Mes interventions',
     demandes: 'Mes demandes',
     suivi_activites: 'Suivi des activitÃ©s',
     gestion_demandes: 'Gestion des demandes',

@@ -19,3 +19,19 @@ create table role (
 insert into role (code_role, libelle_role)
 values ('EMPLOYE', 'Employé - accès à son espace personnel'),
        ('ADMIN', 'Administrateur - accès complet au logiciel');
+
+insert into role (
+  code_role,
+  libelle_role
+)
+values
+(
+  'INTERVENANT',
+  'Employé qui peut déclarer des interventions extérieures'
+),
+(
+  'RESPONSABLE_INTERVENTION',
+  'Responsable des interventions, il peut consulter et gérer les interventions'
+);
+
+------------------------------------------------------------------------------------------------------

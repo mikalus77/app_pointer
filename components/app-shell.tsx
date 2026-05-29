@@ -6,7 +6,7 @@ import styles from './app-shell.module.css'
 
 type AppShellProps = {
   connectedUsername: string
-  userRole?: 'ADMIN' | 'EMPLOYE'
+  userRole?: 'ADMIN' | 'EMPLOYE' | 'INTERVENANT' | 'RESPONSABLE_INTERVENTION'
   activeTab: 'tab1' | 'tab2'
   activeMenu: ActiveMenu
   activeDemandesSubMenu: 'nouvelle' | 'voir' | null
@@ -57,8 +57,12 @@ export function AppShell({
   onSelectUser,
   children,
 }: AppShellProps) {
-  const isAdmin = userRole === 'ADMIN'
-  const resolvedActiveTab = isAdmin ? activeTab : 'tab1'
+  const normalizedRole = userRole.toUpperCase() as AppShellProps['userRole']
+  const isAdmin = normalizedRole === 'ADMIN'
+  const isEmployeLike = normalizedRole === 'EMPLOYE' || normalizedRole === 'INTERVENANT'
+  const isResponsableIntervention = normalizedRole === 'RESPONSABLE_INTERVENTION'
+  const canAccessUsersTab = isAdmin || isResponsableIntervention
+  const resolvedActiveTab = canAccessUsersTab ? activeTab : 'tab1'
   const isSuiviActivitesActive = [
     'gestion_demandes',
     'gestion_taches',
@@ -108,7 +112,7 @@ export function AppShell({
           >
             Mon espace
           </button>
-          {isAdmin ? (
+          {canAccessUsersTab ? (
             <button
               type="button"
               role="tab"
@@ -127,27 +131,38 @@ export function AppShell({
         <aside className={styles.menuZone} aria-label="Zone menu">
           {resolvedActiveTab === 'tab1' ? (
             <nav className={styles.verticalMenu} aria-label="Menu principal">
-              <button
-                type="button"
-                className={`${styles.menuItem} ${activeMenu === 'accueil' ? styles.menuItemActive : ''}`}
-                onClick={onOpenAgenda}
-              >
-                Mon agenda
-              </button>
-              <button
-                type="button"
-                className={`${styles.menuItem} ${activeMenu === 'pointer' ? styles.menuItemActive : ''}`}
-                onClick={onOpenPointage}
-              >
-                Mon pointage
-              </button>
-              <button
-                type="button"
-                className={`${styles.menuItem} ${activeMenu === 'taches' ? styles.menuItemActive : ''}`}
-                onClick={() => onOpenMenu('taches')}
-              >
-                Mes tâches
-              </button>
+              {isEmployeLike || isAdmin ? (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.menuItem} ${activeMenu === 'accueil' ? styles.menuItemActive : ''}`}
+                    onClick={onOpenAgenda}
+                  >
+                    Mon agenda
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.menuItem} ${activeMenu === 'pointer' ? styles.menuItemActive : ''}`}
+                    onClick={onOpenPointage}
+                  >
+                    Mon pointage
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.menuItem} ${activeMenu === 'taches' ? styles.menuItemActive : ''}`}
+                    onClick={() => onOpenMenu('taches')}
+                  >
+                    Mes tâches
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.menuItem} ${activeMenu === 'interventions' ? styles.menuItemActive : ''}`}
+                    onClick={() => onOpenMenu('interventions')}
+                  >
+                    Mes interventions
+                  </button>
+                </>
+              ) : null}
               {isAdmin ? (
                 <>
                   <button

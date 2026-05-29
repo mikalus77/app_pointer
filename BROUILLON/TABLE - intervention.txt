@@ -1,0 +1,35 @@
+intervention(
+	id_intervention
+	id_utilisateur
+	date_intervention
+	lieu_intervention
+	nombre_appel_intervention
+	début_intervention
+	fin_intervention
+        commentaire_intervention
+);
+
+------------------------------------------------------------------------------------------------------------------
+
+create table intervention (
+  id_intervention bigint generated always as identity primary key,
+  id_utilisateur bigint not null,
+  date_intervention date not null,
+  lieu_intervention varchar(200) not null,
+  nombre_appels_intervention integer not null,
+  debut_intervention time not null,
+  fin_intervention time not null,
+  commentaire_intervention text,
+
+  constraint fk_intervention_utilisateur
+    foreign key (id_utilisateur)
+    references utilisateur(id_utilisateur),
+
+  constraint intervention_nombre_appels_check
+    check (nombre_appels_intervention >= 0),
+
+  constraint intervention_heures_check
+    check (debut_intervention < fin_intervention)
+);
+
+------------------------------------------------------------------------------------------------------------------

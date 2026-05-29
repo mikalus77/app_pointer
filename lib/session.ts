@@ -7,7 +7,7 @@ export const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000
 export type AppSession = {
   userId: number
   username: string
-  role: 'ADMIN' | 'EMPLOYE'
+  role: 'ADMIN' | 'EMPLOYE' | 'INTERVENANT' | 'RESPONSABLE_INTERVENTION'
   expiresAt: number
 }
 
@@ -37,6 +37,20 @@ function getSessionSecret() {
   }
 
   return secret
+}
+
+function normalizeRole(value: unknown): AppSession['role'] | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toUpperCase()
+  if (
+    normalized === 'ADMIN' ||
+    normalized === 'EMPLOYE' ||
+    normalized === 'INTERVENANT' ||
+    normalized === 'RESPONSABLE_INTERVENTION'
+  ) {
+    return normalized
+  }
+  return null
 }
 
 async function getSigningKey() {
@@ -87,7 +101,7 @@ export async function verifySessionToken(token: string | undefined | null) {
     if (
       typeof parsedPayload.userId !== 'number' ||
       typeof parsedPayload.username !== 'string' ||
-      (parsedPayload.role !== 'ADMIN' && parsedPayload.role !== 'EMPLOYE') ||
+      normalizeRole(parsedPayload.role) === null ||
       typeof parsedPayload.expiresAt !== 'number'
     ) {
       return null
@@ -97,7 +111,10 @@ export async function verifySessionToken(token: string | undefined | null) {
       return null
     }
 
-    return parsedPayload
+    return {
+      ...parsedPayload,
+      role: normalizeRole(parsedPayload.role)!,
+    }
   } catch {
     return null
   }

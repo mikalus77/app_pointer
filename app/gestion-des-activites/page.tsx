@@ -863,6 +863,7 @@ export default function GestionActivitesPage() {
       if (menu === 'accueil') router.push('/accueil')
       else if (menu === 'pointer') router.push('/pointage')
       else if (menu === 'taches') router.push('/taches')
+      else if (menu === 'interventions') router.push('/interventions')
       else if (menu === 'gestion_taches') router.push('/gestion-des-activites')
     },
     [router]

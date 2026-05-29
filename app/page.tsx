@@ -39,6 +39,12 @@ export default function Home() {
   const [adresse, setAdresse] = useState("");
   const [erreurInscription, setErreurInscription] = useState("");
   const [inscriptionSuccess, setInscriptionSuccess] = useState("");
+  const normalizeErrorMessage = (message: string) => {
+    const trimmed = message.trim();
+    if (!trimmed) return "Une erreur est survenue !";
+    const withoutEndingPunctuation = trimmed.replace(/[.!]+$/g, "");
+    return `${withoutEndingPunctuation} !`;
+  };
 
   const handleConnexion = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -56,11 +62,13 @@ export default function Home() {
     });
 
     const responseData = (await response.json().catch(() => null)) as
-      | { username?: string; error?: string }
+      | { username?: string; role?: string; error?: string }
       | null;
 
     if (!response.ok || !responseData?.username) {
-      setErreurConnexion(responseData?.error ?? "Nom d'utilisateur ou mot de passe incorrect !");
+      setErreurConnexion(
+        normalizeErrorMessage(responseData?.error ?? "Nom d'utilisateur ou mot de passe incorrect")
+      );
       return;
     }
 
@@ -69,6 +77,11 @@ export default function Home() {
       responseData.username ?? username
     );
     window.dispatchEvent(new Event(CONNECTED_USERNAME_CHANGED_EVENT));
+    const roleCode = String(responseData.role ?? "").trim().toUpperCase();
+    if (roleCode === "RESPONSABLE_INTERVENTION") {
+      router.push("/utilisateurs");
+      return;
+    }
     router.push("/accueil");
   };
 
@@ -78,19 +91,19 @@ export default function Home() {
     setInscriptionSuccess("");
 
     if (!nom.trim() || !prenom.trim() || !registerUsername.trim() || !registerPassword || !email.trim()) {
-      setErreurInscription("Veuillez remplir les champs obligatoires.");
+      setErreurInscription("Veuillez remplir les champs obligatoires !");
       return;
     }
 
     if (registerUsername.trim().length > USERNAME_MAX_LENGTH) {
       setErreurInscription(
-        `Le nom d'utilisateur doit contenir au maximum ${USERNAME_MAX_LENGTH} caractères.`
+        `Le nom d'utilisateur doit contenir au maximum ${USERNAME_MAX_LENGTH} caractères !`
       );
       return;
     }
 
     if (registerPassword !== registerPasswordConfirm) {
-      setErreurInscription("Les mots de passe ne correspondent pas.");
+      setErreurInscription("Les mots de passe ne correspondent pas !");
       return;
     }
 
@@ -115,7 +128,9 @@ export default function Home() {
       | null;
 
     if (!response.ok || !responseData?.success) {
-      setErreurInscription(responseData?.error ?? "Impossible d'enregistrer l'inscription.");
+      setErreurInscription(
+        normalizeErrorMessage(responseData?.error ?? "Impossible d'enregistrer l'inscription")
+      );
       return;
     }
 
@@ -166,7 +181,9 @@ export default function Home() {
       | null;
 
     if (!response.ok || !responseData?.success) {
-      setErreurForgotPassword(responseData?.error ?? "Impossible de modifier le mot de passe !");
+      setErreurForgotPassword(
+        normalizeErrorMessage(responseData?.error ?? "Impossible de modifier le mot de passe")
+      );
       return;
     }
 
@@ -189,7 +206,30 @@ export default function Home() {
     userSelect: "none" as const,
   });
 
-  const inputStyle = { padding: "12px", borderRadius: "8px", border: "1px solid #ccc" };
+  const inputStyle = {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    boxSizing: "border-box" as const,
+    overflowX: "auto" as const,
+    whiteSpace: "nowrap" as const,
+    textOverflow: "ellipsis",
+  };
+  const passwordInputStyle = { ...inputStyle, paddingRight: "44px" };
+  const passwordFieldWrapStyle = { position: "relative" as const, width: "100%" };
+  const passwordToggleStyle = {
+    position: "absolute" as const,
+    right: "10px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    fontSize: "16px",
+    lineHeight: 1,
+    padding: 0,
+  };
 
   return (
     <main
@@ -249,7 +289,10 @@ export default function Home() {
         {activeTab === "connexion" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {!showForgotPasswordForm ? (
-              <form onSubmit={handleConnexion} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <form
+                onSubmit={handleConnexion}
+                style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px" }}
+              >
                 <input
                   type="text"
                   placeholder="Nom d'utilisateur"
@@ -258,23 +301,24 @@ export default function Home() {
                   required
                   style={inputStyle}
                 />
-                <input
-                  type={showLoginPassword ? "text" : "password"}
-                  placeholder="Mot de passe"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
+                <div style={passwordFieldWrapStyle}>
                   <input
-                    type="checkbox"
-                    checked={showLoginPassword}
-                    onChange={(e) => setShowLoginPassword(e.target.checked)}
+                    type={showLoginPassword ? "text" : "password"}
+                    placeholder="Mot de passe"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    style={passwordInputStyle}
                   />
-                  Voir le mot de passe
-                </label>
+                  <button
+                    type="button"
+                    aria-label="Voir le mot de passe"
+                    onClick={() => setShowLoginPassword((prev) => !prev)}
+                    style={passwordToggleStyle}
+                  >
+                    {showLoginPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -303,6 +347,7 @@ export default function Home() {
                 <button
                   type="submit"
                   style={{
+                    marginTop: "11px",
                     padding: "12px",
                     borderRadius: "8px",
                     border: "none",
@@ -316,7 +361,10 @@ export default function Home() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handleForgotPassword} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <form
+                onSubmit={handleForgotPassword}
+                style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "22px" }}
+              >
                 <input
                   type="text"
                   placeholder="Nom d'utilisateur"
@@ -325,38 +373,42 @@ export default function Home() {
                   required
                   style={inputStyle}
                 />
-                <input
-                  type={showForgotPassword ? "text" : "password"}
-                  placeholder="Nouveau mot de passe"
-                  value={forgotPassword}
-                  onChange={(e) => setForgotPassword(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
+                <div style={passwordFieldWrapStyle}>
                   <input
-                    type="checkbox"
-                    checked={showForgotPassword}
-                    onChange={(e) => setShowForgotPassword(e.target.checked)}
+                    type={showForgotPassword ? "text" : "password"}
+                    placeholder="Nouveau mot de passe"
+                    value={forgotPassword}
+                    onChange={(e) => setForgotPassword(e.target.value)}
+                    required
+                    style={passwordInputStyle}
                   />
-                  Voir le mot de passe
-                </label>
-                <input
-                  type={showForgotPasswordConfirm ? "text" : "password"}
-                  placeholder="Confirmer le mot de passe"
-                  value={forgotPasswordConfirm}
-                  onChange={(e) => setForgotPasswordConfirm(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
+                  <button
+                    type="button"
+                    aria-label="Voir le mot de passe"
+                    onClick={() => setShowForgotPassword((prev) => !prev)}
+                    style={passwordToggleStyle}
+                  >
+                    {showForgotPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <div style={passwordFieldWrapStyle}>
                   <input
-                    type="checkbox"
-                    checked={showForgotPasswordConfirm}
-                    onChange={(e) => setShowForgotPasswordConfirm(e.target.checked)}
+                    type={showForgotPasswordConfirm ? "text" : "password"}
+                    placeholder="Confirmer le nouveau mot de passe"
+                    value={forgotPasswordConfirm}
+                    onChange={(e) => setForgotPasswordConfirm(e.target.value)}
+                    required
+                    style={passwordInputStyle}
                   />
-                  Voir le mot de passe
-                </label>
+                  <button
+                    type="button"
+                    aria-label="Voir le mot de passe"
+                    onClick={() => setShowForgotPasswordConfirm((prev) => !prev)}
+                    style={passwordToggleStyle}
+                  >
+                    {showForgotPasswordConfirm ? "🙈" : "👁️"}
+                  </button>
+                </div>
 
                 {erreurForgotPassword ? <p style={{ color: "red", margin: 0 }}>{erreurForgotPassword}</p> : null}
                 {forgotPasswordSuccess ? <p style={{ color: "#2a8a58", margin: 0 }}>{forgotPasswordSuccess}</p> : null}
@@ -364,7 +416,8 @@ export default function Home() {
                 <button
                   type="submit"
                   style={{
-                    padding: "12px",
+                    marginTop: "11px",
+                    padding: "10px",
                     borderRadius: "8px",
                     border: "none",
                     backgroundColor: "#2e4a66",
@@ -385,7 +438,8 @@ export default function Home() {
                     setForgotPasswordConfirm("");
                   }}
                   style={{
-                    padding: "12px",
+                    marginTop: "-3px",
+                    padding: "10px",
                     borderRadius: "8px",
                     border: "1px solid #2e4a66",
                     backgroundColor: "white",
@@ -400,7 +454,10 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <form onSubmit={handleInscription} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <form
+            onSubmit={handleInscription}
+            style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}
+          >
             <input
               type="text"
               placeholder="Prénom *"
@@ -426,38 +483,42 @@ export default function Home() {
               maxLength={USERNAME_MAX_LENGTH}
               style={inputStyle}
             />
-            <input
-              type={showRegisterPassword ? "text" : "password"}
-              placeholder="Mot de passe *"
-              value={registerPassword}
-              onChange={(e) => setRegisterPassword(e.target.value)}
-              required
-              style={inputStyle}
-            />
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
-              <input
-                type="checkbox"
-                checked={showRegisterPassword}
-                onChange={(e) => setShowRegisterPassword(e.target.checked)}
-              />
-              Voir le mot de passe
-            </label>
-            <input
-              type={showRegisterPasswordConfirm ? "text" : "password"}
-              placeholder="Confirmer le mot de passe *"
-              value={registerPasswordConfirm}
-              onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
-              required
-              style={inputStyle}
-            />
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4c5c6c", fontSize: "14px" }}>
-              <input
-                type="checkbox"
-                checked={showRegisterPasswordConfirm}
-                onChange={(e) => setShowRegisterPasswordConfirm(e.target.checked)}
-              />
-              Voir le mot de passe
-            </label>
+                <div style={passwordFieldWrapStyle}>
+                  <input
+                    type={showRegisterPassword ? "text" : "password"}
+                    placeholder="Mot de passe *"
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
+                    required
+                    style={passwordInputStyle}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Voir le mot de passe"
+                    onClick={() => setShowRegisterPassword((prev) => !prev)}
+                    style={passwordToggleStyle}
+                  >
+                    {showRegisterPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+                <div style={passwordFieldWrapStyle}>
+                  <input
+                    type={showRegisterPasswordConfirm ? "text" : "password"}
+                    placeholder="Confirmer le mot de passe *"
+                    value={registerPasswordConfirm}
+                    onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
+                    required
+                    style={passwordInputStyle}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Voir le mot de passe"
+                    onClick={() => setShowRegisterPasswordConfirm((prev) => !prev)}
+                    style={passwordToggleStyle}
+                  >
+                    {showRegisterPasswordConfirm ? "🙈" : "👁️"}
+                  </button>
+                </div>
             <input
               type="email"
               placeholder="Email *"
@@ -506,4 +567,3 @@ export default function Home() {
     </main>
   );
 }
-
